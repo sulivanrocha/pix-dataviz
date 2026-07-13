@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { StatTile } from "../components/StatTile";
-import { ChavesPorParticipante } from "../components/ChavesPorParticipante";
+import { StatTile } from "../components/shared/StatTile";
+import { ChavesPorParticipante } from "../components/charts/chaves/ChavesPorParticipante";
 import { formatNumberCompact } from "../lib/format";
 
 const TOPN_OPTIONS = [5, 10, 20, 50];

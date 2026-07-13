@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { usePixData } from "./lib/usePixData";
-import { TabNav } from "./components/TabNav";
+import { TabNav } from "./components/shared/TabNav";
 import { TABS } from "./lib/tabs";
 import { UsuariosDictPage } from "./pages/UsuariosDictPage";
 import { ChavesPixPage } from "./pages/ChavesPixPage";

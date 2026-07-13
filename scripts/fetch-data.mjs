@@ -4,12 +4,14 @@
 //
 // Uso: node scripts/fetch-data.mjs
 
-import { writeFile } from "node:fs/promises";
+import { writeFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { ufPorEstadoIbge } from "../src/lib/uf.js";
 
 const BASE = "https://olinda.bcb.gov.br/olinda/servico/Pix_DadosAbertos/versao/v1/odata";
 const OUT_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "public", "data");
+const MUNICIPIOS_DIR = join(OUT_DIR, "municipios");
 
 // A API ignora o parâmetro de data das funções (Database/DataBase/Data) para fins
 // de filtro — ele é obrigatório na assinatura, mas sempre retorna o histórico
@@ -101,9 +103,7 @@ async function buildTransacoes() {
 // --- Transações Pix por Município ---
 // Dataset bruto é por município (~5.5k) por mês (~83k linhas). Agregamos por
 // estado para viabilizar mapa/filtro sem enviar granularidade municipal.
-async function buildMunicipio() {
-  const rows = await fetchAll("TransacoesPixPorMunicipio", "DataBase=%27202001%27", 800000);
-
+function buildMunicipio(rows) {
   const map = new Map();
   for (const r of rows) {
     const key = `${r.AnoMes}|${r.Estado}`;
@@ -156,6 +156,49 @@ async function buildMunicipio() {
   return { porEstadoMensal };
 }
 
+// --- Transações Pix por Município (granularidade municipal) ---
+// Mesmo dataset bruto de buildMunicipio, mas sem descartar Municipio_Ibge:
+// um índice com um registro por município (para nome/UF/região) e, por
+// estado, a série mensal de cada município (para mapas/rankings municipais).
+function buildMunicipiosDetalhado(rows) {
+  const indexMap = new Map();
+  const porEstadoMap = new Map();
+
+  for (const r of rows) {
+    if (!indexMap.has(r.Municipio_Ibge)) {
+      indexMap.set(r.Municipio_Ibge, {
+        ibge: r.Municipio_Ibge,
+        nome: r.Municipio,
+        estadoIbge: r.Estado_Ibge,
+        estado: r.Estado,
+        uf: ufPorEstadoIbge(r.Estado_Ibge),
+        regiao: r.Regiao,
+      });
+    }
+
+    const serie = porEstadoMap.get(r.Estado_Ibge) ?? [];
+    serie.push({
+      AnoMes: r.AnoMes,
+      Municipio_Ibge: r.Municipio_Ibge,
+      VL_PagadorPF: round2(r.VL_PagadorPF ?? 0),
+      QT_PagadorPF: r.QT_PagadorPF ?? 0,
+      QT_PES_PagadorPF: r.QT_PES_PagadorPF ?? 0,
+      VL_PagadorPJ: round2(r.VL_PagadorPJ ?? 0),
+      QT_PagadorPJ: r.QT_PagadorPJ ?? 0,
+      QT_PES_PagadorPJ: r.QT_PES_PagadorPJ ?? 0,
+    });
+    porEstadoMap.set(r.Estado_Ibge, serie);
+  }
+
+  const index = [...indexMap.values()].sort((a, b) => a.nome.localeCompare(b.nome));
+
+  for (const serie of porEstadoMap.values()) {
+    serie.sort((a, b) => a.AnoMes - b.AnoMes || a.Municipio_Ibge - b.Municipio_Ibge);
+  }
+
+  return { index, porEstado: porEstadoMap };
+}
+
 // --- Estoque de Chaves Pix por Participante ---
 // A API exige uma data exata (Data=AAAA-MM-DD) e só tem estoque do último
 // dia de cada mês. Tenta os últimos meses até achar o mais recente publicado.
@@ -201,7 +244,9 @@ async function main() {
   const transacoes = await buildTransacoes();
 
   console.log("Baixando Transações Pix por Município (~400k linhas, histórico completo desde nov/2020, pode levar ~30s)...");
-  const municipio = await buildMunicipio();
+  const municipioRows = await fetchAll("TransacoesPixPorMunicipio", "DataBase=%27202001%27", 800000);
+  const municipio = buildMunicipio(municipioRows);
+  const municipiosDetalhado = buildMunicipiosDetalhado(municipioRows);
 
   console.log("Baixando Estoque de Chaves Pix por Participante...");
   const chaves = await buildChavesPix();
@@ -212,6 +257,16 @@ async function main() {
   await writeFile(join(OUT_DIR, "transacoes.json"), JSON.stringify({ generatedAt, ...transacoes }));
   await writeFile(join(OUT_DIR, "municipio.json"), JSON.stringify({ generatedAt, ...municipio }));
   await writeFile(join(OUT_DIR, "chaves.json"), JSON.stringify({ generatedAt, ...chaves }));
+
+  await writeFile(
+    join(OUT_DIR, "municipios-index.json"),
+    JSON.stringify({ generatedAt, municipios: municipiosDetalhado.index })
+  );
+
+  await mkdir(MUNICIPIOS_DIR, { recursive: true });
+  for (const [estadoIbge, serie] of municipiosDetalhado.porEstado) {
+    await writeFile(join(MUNICIPIOS_DIR, `${estadoIbge}.json`), JSON.stringify({ generatedAt, dados: serie }));
+  }
 
   console.log(`OK. Arquivos gerados em ${OUT_DIR}`);
 }

@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
-import { Filters } from "../components/Filters";
-import { StatTile } from "../components/StatTile";
-import { StateRanking } from "../components/StateRanking";
+import { Filters } from "../components/shared/Filters";
+import { StatTile } from "../components/shared/StatTile";
+import { StateRanking } from "../components/charts/municipio/StateRanking";
+import { MunicipioSelector } from "../components/MunicipioSelector";
+import { MunicipioPFPJChart } from "../components/MunicipioPFPJChart";
 import { formatCurrencyCompact, formatCurrencyFull, formatNumberCompact } from "../lib/format";
 
 const REGIOES = [
@@ -22,6 +24,12 @@ export function TransacoesMunicipioPage({ municipio }) {
   const [end, setEnd] = useState(null);
   const [regiao, setRegiao] = useState("Todas");
   const range = { start: start ?? months[0], end: end ?? months[months.length - 1] };
+
+  const [selecaoMunicipio, setSelecaoMunicipio] = useState({ municipio: null, dadosEstado: [] });
+  const serieMunicipio = useMemo(() => {
+    if (!selecaoMunicipio.municipio) return [];
+    return selecaoMunicipio.dadosEstado.filter((r) => r.Municipio_Ibge === selecaoMunicipio.municipio.ibge);
+  }, [selecaoMunicipio]);
 
   const totals = useMemo(() => {
     const filtered = municipio.porEstadoMensal.filter(
@@ -68,6 +76,17 @@ export function TransacoesMunicipioPage({ municipio }) {
       <section className="charts-grid">
         <StateRanking porEstadoMensal={municipio.porEstadoMensal} start={range.start} end={range.end} regiao={regiao} />
       </section>
+
+      <MunicipioSelector
+        onChange={(s) => setSelecaoMunicipio({ municipio: s.municipio, dadosEstado: s.dadosEstado })}
+      />
+
+      {selecaoMunicipio.municipio && (
+        <section className="charts-grid">
+          <MunicipioPFPJChart serieMensal={serieMunicipio} tipo="PF" />
+          <MunicipioPFPJChart serieMensal={serieMunicipio} tipo="PJ" />
+        </section>
+      )}
     </>
   );
 }

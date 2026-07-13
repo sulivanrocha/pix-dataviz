@@ -29,10 +29,23 @@ estático em `public/data/`, que o app consome via `fetch()`:
 | `usuarios_dict.json` | `PixUsuariosCadastradosDICT` | Estoque mensal de usuários PF/PJ cadastrados no DICT (histórico completo desde 2020) |
 | `transacoes.json` | `EstatisticasTransacoesPix` | Total mensal (valor/quantidade) + composição por natureza, finalidade, forma de iniciação, região e PF/PJ do pagador |
 | `municipio.json` | `TransacoesPixPorMunicipio` | Valor/quantidade agregados por estado e mês (a partir do dado bruto por município) |
+| `municipios-index.json` | `TransacoesPixPorMunicipio` | Índice com um registro por município (ibge, nome, estado, uf, região), sem granularidade mensal |
+| `municipios/{Estado_Ibge}.json` | `TransacoesPixPorMunicipio` | Um arquivo por estado (27 no total) com a série mensal de cada município daquele estado |
 
 O dataset bruto de transações tem ~200 mil linhas e o de município ~80 mil —
 por isso são agregados em cubos pequenos no momento do fetch, em vez de
-enviados crus para o navegador.
+enviados crus para o navegador. `municipios-index.json` e `municipios/*.json`
+são gerados a partir do mesmo dado bruto de `TransacoesPixPorMunicipio` que
+alimenta `municipio.json`, mas preservam a granularidade municipal (`Municipio_Ibge`)
+em vez de agregar só por estado — use-os quando precisar de dado por município
+em vez de por estado.
+
+**Atenção com `QT_PES_PagadorPF` e `QT_PES_PagadorPJ`** (em `municipios/*.json`):
+são contagens de pessoas *distintas* que pagaram naquele município naquele mês.
+Uma mesma pessoa pode aparecer em vários meses, então **não some esses campos
+entre meses** — o resultado não é "total de pessoas únicas no período", é uma
+contagem inflada por reaparições. Para um total no período, é necessário
+reprocessar a partir do dado bruto (não incluído nestes snapshots agregados).
 
 **Para atualizar os dados**, reexecute `node scripts/fetch-data.mjs` e
 publique de novo (os JSON ficam versionados em `public/data/`). Não há

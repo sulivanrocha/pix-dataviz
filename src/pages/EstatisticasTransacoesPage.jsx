@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { Filters } from "../components/Filters";
-import { StatTile } from "../components/StatTile";
-import { TrendChart } from "../components/TrendChart";
-import { CategoryBreakdown } from "../components/CategoryBreakdown";
+import { Filters } from "../components/shared/Filters";
+import { StatTile } from "../components/shared/StatTile";
+import { TrendChart } from "../components/charts/transacoes/TrendChart";
+import { CategoryBreakdown } from "../components/charts/transacoes/CategoryBreakdown";
 import { formatAnoMes, formatCurrencyCompact, formatCurrencyFull, formatNumberCompact } from "../lib/format";
 
 function pctDelta(current, previous) {

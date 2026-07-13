@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { Filters } from "../components/Filters";
-import { StatTile } from "../components/StatTile";
-import { UsersGrowthChart } from "../components/UsersGrowthChart";
+import { Filters } from "../components/shared/Filters";
+import { StatTile } from "../components/shared/StatTile";
+import { UsersGrowthChart } from "../components/charts/dict/UsersGrowthChart";
 import { formatNumberCompact } from "../lib/format";
 
 function pctDelta(current, previous) {
