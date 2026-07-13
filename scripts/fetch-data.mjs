@@ -200,40 +200,40 @@ function buildMunicipiosDetalhado(rows) {
 }
 
 // --- Estoque de Chaves Pix por Participante ---
-// A API exige uma data exata (Data=AAAA-MM-DD) e só tem estoque do último
-// dia de cada mês. Tenta os últimos meses até achar o mais recente publicado.
-function lastDayOfMonth(year, month) {
-  // new Date(Date.UTC(year, month, 0)) = dia 0 do mês seguinte = último dia do mês atual
-  return new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
-}
-
-async function fetchLatestChaves() {
-  const now = new Date();
-  for (let i = 0; i < 6; i++) {
-    const year = now.getUTCFullYear();
-    const month = now.getUTCMonth() + 1 - i; // 1-indexado, pode ir < 1 (JS normaliza)
-    const data = lastDayOfMonth(year, month);
-    const rows = await fetchAll("ChavesPix", `Data=%27${data}%27`);
-    if (rows.length > 0) return { data, rows };
+// Assim como EstatisticasTransacoesPix e TransacoesPixPorMunicipio, a API
+// ignora o parâmetro Data para fins de filtro (obrigatório na assinatura, mas
+// sempre retorna o histórico completo desde nov/2020, ~400k linhas). Uma
+// chamada com $top alto basta; agregamos meses e participantes no cliente.
+function porMesChaves(rows) {
+  const map = new Map();
+  for (const r of rows) {
+    const cur = map.get(r.Data) ?? { PF: 0, PJ: 0 };
+    cur[r.NaturezaUsuario] = (cur[r.NaturezaUsuario] ?? 0) + r.qtdChaves;
+    map.set(r.Data, cur);
   }
-  throw new Error("ChavesPix: nenhum estoque encontrado nos últimos 6 meses");
+  return [...map.entries()]
+    .map(([data, v]) => ({ data, PF: v.PF, PJ: v.PJ, total: v.PF + v.PJ }))
+    .sort((a, b) => a.data.localeCompare(b.data));
 }
 
-async function buildChavesPix() {
-  const { data, rows } = await fetchLatestChaves();
-
+function porParticipanteDeChaves(rows) {
   const map = new Map();
   for (const r of rows) {
     const cur = map.get(r.Nome) ?? { participante: r.Nome, PF: 0, PJ: 0 };
     cur[r.NaturezaUsuario] = (cur[r.NaturezaUsuario] ?? 0) + r.qtdChaves;
     map.set(r.Nome, cur);
   }
-
-  const porParticipante = [...map.values()]
+  return [...map.values()]
     .map((v) => ({ ...v, total: v.PF + v.PJ }))
     .sort((a, b) => b.total - a.total);
+}
 
-  return { data, porParticipante };
+function buildChavesPix(rows) {
+  const historico = porMesChaves(rows);
+  const ultimaData = historico[historico.length - 1].data;
+  const porParticipante = porParticipanteDeChaves(rows.filter((r) => r.Data === ultimaData));
+
+  return { data: ultimaData, historico, porParticipante };
 }
 
 async function main() {
@@ -248,8 +248,9 @@ async function main() {
   const municipio = buildMunicipio(municipioRows);
   const municipiosDetalhado = buildMunicipiosDetalhado(municipioRows);
 
-  console.log("Baixando Estoque de Chaves Pix por Participante...");
-  const chaves = await buildChavesPix();
+  console.log("Baixando Estoque de Chaves Pix (~400k linhas, histórico completo desde nov/2020)...");
+  const chavesRows = await fetchAll("ChavesPix", "Data=%272020-11-30%27", 600000);
+  const chaves = buildChavesPix(chavesRows);
 
   const generatedAt = new Date().toISOString();
 
