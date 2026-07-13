@@ -6,19 +6,22 @@ import { formatNumberCompact } from "../lib/format";
 const TOPN_OPTIONS = [5, 10, 20, 50];
 
 export function ChavesPixPage({ chaves }) {
-  const [tipo, setTipo] = useState("total");
   const [topN, setTopN] = useState(10);
 
   const totals = useMemo(
     () =>
       chaves.porParticipante.reduce(
-        (acc, p) => {
-          acc.PF += p.PF;
-          acc.PJ += p.PJ;
-          acc.total += p.total;
+        (acc, participante) => {
+          acc.PF += participante.PF;
+          acc.PJ += participante.PJ;
+          acc.total += participante.total;
           return acc;
         },
-        { PF: 0, PJ: 0, total: 0 }
+        {
+          PF: 0,
+          PJ: 0,
+          total: 0,
+        }
       ),
     [chaves.porParticipante]
   );
@@ -26,35 +29,49 @@ export function ChavesPixPage({ chaves }) {
   return (
     <>
       <section className="kpi-row">
-        <StatTile label="Total de chaves Pix cadastradas" value={formatNumberCompact(totals.total)} />
-        <StatTile label="Chaves de pessoa física" value={formatNumberCompact(totals.PF)} />
-        <StatTile label="Chaves de pessoa jurídica" value={formatNumberCompact(totals.PJ)} />
+        <StatTile
+          label="Total de chaves Pix cadastradas"
+          value={formatNumberCompact(totals.total)}
+        />
+
+        <StatTile
+          label="Chaves de pessoa física"
+          value={formatNumberCompact(totals.PF)}
+        />
+
+        <StatTile
+          label="Chaves de pessoa jurídica"
+          value={formatNumberCompact(totals.PJ)}
+        />
       </section>
 
       <div className="filters-row">
         <label>
-          Tipo de usuário
-          <select value={tipo} onChange={(e) => setTipo(e.target.value)}>
-            <option value="total">Física e jurídica</option>
-            <option value="PF">Pessoa física</option>
-            <option value="PJ">Pessoa jurídica</option>
-          </select>
-        </label>
-        <label>
           Top N participantes
-          <select value={topN} onChange={(e) => setTopN(Number(e.target.value))}>
-            {TOPN_OPTIONS.map((n) => (
-              <option key={n} value={n}>
-                {n}
+
+          <select
+            value={topN}
+            onChange={(event) => setTopN(Number(event.target.value))}
+          >
+            {TOPN_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
               </option>
             ))}
           </select>
         </label>
-        <span className="filters-hint">Estoque de chaves Pix por instituição participante.</span>
+
+        <span className="filters-hint">
+          Estoque de chaves Pix por instituição participante, com rankings separados para PF e PJ.
+        </span>
       </div>
 
       <section className="charts-grid">
-        <ChavesPorParticipante data={chaves.data} porParticipante={chaves.porParticipante} tipo={tipo} topN={topN} />
+        <ChavesPorParticipante
+          data={chaves.data}
+          porParticipante={chaves.porParticipante}
+          topN={topN}
+        />
       </section>
     </>
   );
