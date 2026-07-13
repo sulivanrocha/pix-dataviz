@@ -250,7 +250,7 @@ body {
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   border-radius: 0;
-  padding: 16px 18px;
+  padding: 20px 18px;   /* was 16px 18px */
 }
 
 .stat-tile .stat-label {
@@ -263,8 +263,9 @@ body {
 
 .stat-tile .stat-value {
   font-family: var(--serif);
-  font-size: 28px;
-  font-weight: 700;
+  font-size: 34px;          /* was 28px */
+  font-weight: 800;         /* was 700 */
+  letter-spacing: -0.5px;   /* tightens the bigger size, avoids looking loose */
   margin: 0;
   font-variant-numeric: proportional-nums;
 }
@@ -310,8 +311,8 @@ body {
 
 .chart-card-header h2 {
   font-family: var(--serif);
-  font-weight: 600;
-  font-style: italic;
+  font-weight: 700;       /* was 600 */
+  font-style: normal;     /* was italic */
   font-size: 17px;
   margin: 0;
 }
