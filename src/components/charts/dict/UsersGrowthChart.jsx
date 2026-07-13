@@ -2,11 +2,10 @@ import { useMemo } from "react";
 import {
   BarChart,
   Bar,
+  CartesianGrid,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from "recharts";
 import { ChartCard } from "../../shared/ChartCard";
@@ -31,7 +30,7 @@ export function UsersGrowthChart({ usuariosDict }) {
   );
 
   const tickInterval = Math.max(
-    Math.ceil(rows.length / 9) - 1,
+    Math.ceil(rows.length / 6) - 1,
     0
   );
 
@@ -41,114 +40,178 @@ export function UsersGrowthChart({ usuariosDict }) {
       subtitle="Evolução mensal de pessoas físicas e jurídicas desde o lançamento do Pix"
       fullWidth
     >
-      <ResponsiveContainer width="100%" height={340}>
-        <BarChart
-          data={rows}
-          margin={{
-            top: 12,
-            right: 20,
-            left: 8,
-            bottom: 0,
-          }}
-          barGap={1}
-          barCategoryGap="20%"
-        >
-          <CartesianGrid
-            stroke="var(--gridline)"
-            vertical={false}
-          />
+      <div className="users-growth-grid">
+        <section className="users-growth-panel">
+          <h3
+            className="users-growth-panel__title"
+            style={{ color: "var(--series-1)" }}
+          >
+            Pessoa física
+          </h3>
 
-          <XAxis
-            dataKey="mes"
-            tick={{
-              fontSize: 11,
-              fill: "var(--text-muted)",
-            }}
-            axisLine={{
-              stroke: "var(--baseline)",
-            }}
-            tickLine={false}
-            interval={tickInterval}
-          />
-
-          <YAxis
-            yAxisId="pf"
-            orientation="left"
-            tick={{
-              fontSize: 11,
-              fill: "var(--series-1)",
-            }}
-            axisLine={false}
-            tickLine={false}
-            width={52}
-            tickFormatter={formatNumberCompact}
-          />
-
-          <YAxis
-            yAxisId="pj"
-            orientation="right"
-            tick={{
-              fontSize: 11,
-              fill: "var(--series-2)",
-            }}
-            axisLine={false}
-            tickLine={false}
-            width={52}
-            tickFormatter={formatNumberCompact}
-          />
-
-          <Tooltip
-            cursor={{
-              fill: "var(--gridline)",
-              opacity: 0.35,
-            }}
-            content={
-              <ChartTooltip
-                formatValue={formatNumberFull}
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart
+              data={rows}
+              margin={{
+                top: 8,
+                right: 12,
+                left: 4,
+                bottom: 0,
+              }}
+              barCategoryGap="24%"
+            >
+              <CartesianGrid
+                stroke="var(--gridline)"
+                vertical={false}
               />
-            }
-          />
 
-          <Legend
-            verticalAlign="top"
-            align="left"
-            wrapperStyle={{
-              fontSize: 12,
-              paddingBottom: 16,
-            }}
-            formatter={(value) => (
-              <span
-                style={{
-                  color: "var(--text-secondary)",
+              <XAxis
+                dataKey="mes"
+                tick={{
+                  fontSize: 11,
+                  fill: "var(--text-muted)",
                 }}
-              >
-                {value}
-              </span>
-            )}
-            itemSorter={() => 0}
-          />
+                axisLine={{
+                  stroke: "var(--baseline)",
+                }}
+                tickLine={false}
+                interval={tickInterval}
+              />
 
-          <Bar
-            yAxisId="pf"
-            dataKey="pessoaFisica"
-            name="Pessoa física — eixo esquerdo"
-            fill="var(--series-1)"
-            radius={[3, 3, 0, 0]}
-            maxBarSize={12}
-            animationDuration={700}
-          />
+              <YAxis
+                tick={{
+                  fontSize: 11,
+                  fill: "var(--text-muted)",
+                }}
+                axisLine={false}
+                tickLine={false}
+                width={50}
+                tickFormatter={formatNumberCompact}
+              />
 
-          <Bar
-            yAxisId="pj"
-            dataKey="pessoaJuridica"
-            name="Pessoa jurídica — eixo direito"
-            fill="var(--series-2)"
-            radius={[3, 3, 0, 0]}
-            maxBarSize={12}
-            animationDuration={700}
-          />
-        </BarChart>
-      </ResponsiveContainer>
+              <Tooltip
+                cursor={{
+                  fill: "var(--gridline)",
+                  opacity: 0.35,
+                }}
+                content={
+                  <ChartTooltip
+                    formatValue={formatNumberFull}
+                  />
+                }
+              />
+
+              <Bar
+                dataKey="pessoaFisica"
+                name="Pessoa física"
+                fill="var(--series-1)"
+                radius={[3, 3, 0, 0]}
+                maxBarSize={14}
+                animationDuration={700}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </section>
+
+        <section className="users-growth-panel">
+          <h3
+            className="users-growth-panel__title"
+            style={{ color: "var(--series-2)" }}
+          >
+            Pessoa jurídica
+          </h3>
+
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart
+              data={rows}
+              margin={{
+                top: 8,
+                right: 12,
+                left: 4,
+                bottom: 0,
+              }}
+              barCategoryGap="24%"
+            >
+              <CartesianGrid
+                stroke="var(--gridline)"
+                vertical={false}
+              />
+
+              <XAxis
+                dataKey="mes"
+                tick={{
+                  fontSize: 11,
+                  fill: "var(--text-muted)",
+                }}
+                axisLine={{
+                  stroke: "var(--baseline)",
+                }}
+                tickLine={false}
+                interval={tickInterval}
+              />
+
+              <YAxis
+                tick={{
+                  fontSize: 11,
+                  fill: "var(--text-muted)",
+                }}
+                axisLine={false}
+                tickLine={false}
+                width={50}
+                tickFormatter={formatNumberCompact}
+              />
+
+              <Tooltip
+                cursor={{
+                  fill: "var(--gridline)",
+                  opacity: 0.35,
+                }}
+                content={
+                  <ChartTooltip
+                    formatValue={formatNumberFull}
+                  />
+                }
+              />
+
+              <Bar
+                dataKey="pessoaJuridica"
+                name="Pessoa jurídica"
+                fill="var(--series-2)"
+                radius={[3, 3, 0, 0]}
+                maxBarSize={14}
+                animationDuration={700}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </section>
+      </div>
+
+      <style>
+        {`
+          .users-growth-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 24px;
+          }
+
+          .users-growth-panel {
+            min-width: 0;
+          }
+
+          .users-growth-panel__title {
+            margin: 0 0 12px;
+            font-size: 14px;
+            font-weight: 600;
+          }
+
+          @media (max-width: 800px) {
+            .users-growth-grid {
+              grid-template-columns: 1fr;
+              gap: 32px;
+            }
+          }
+        `}
+      </style>
     </ChartCard>
   );
 }
