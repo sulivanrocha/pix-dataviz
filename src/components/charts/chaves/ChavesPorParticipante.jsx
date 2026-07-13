@@ -23,7 +23,10 @@ function ParticipantChart({
   dataKey,
   color,
 }) {
-  const chartHeight = Math.max(320, rows.length * 34);
+  const chartHeight = Math.max(
+    300,
+    rows.length * 40
+  );
 
   return (
     <section className="participant-chart-panel">
@@ -34,7 +37,10 @@ function ParticipantChart({
         {title}
       </h3>
 
-      <ResponsiveContainer width="100%" height={chartHeight}>
+      <ResponsiveContainer
+        width="100%"
+        height={chartHeight}
+      >
         <BarChart
           data={rows}
           layout="vertical"
@@ -73,7 +79,8 @@ function ParticipantChart({
               stroke: "var(--baseline)",
             }}
             tickLine={false}
-            width={170}
+            width={175}
+            interval={0}
           />
 
           <Tooltip
@@ -93,7 +100,7 @@ function ParticipantChart({
             name="Número de chaves"
             fill={color}
             radius={[0, 4, 4, 0]}
-            maxBarSize={22}
+            maxBarSize={24}
             animationDuration={700}
           />
         </BarChart>
@@ -105,53 +112,63 @@ function ParticipantChart({
 export function ChavesPorParticipante({
   data,
   porParticipante,
-  topN = 10,
+  topN = 5,
 }) {
   const rowsPF = useMemo(
     () =>
       [...porParticipante]
-        .filter((row) => Number(row.PF) > 0)
-        .sort((a, b) => Number(b.PF) - Number(a.PF))
-        .slice(0, topN)
-        .reverse(),
+        .filter(
+          (row) => Number(row.PF) > 0
+        )
+        .sort(
+          (a, b) =>
+            Number(b.PF) - Number(a.PF)
+        )
+        .slice(0, topN),
     [porParticipante, topN]
   );
 
   const rowsPJ = useMemo(
     () =>
       [...porParticipante]
-        .filter((row) => Number(row.PJ) > 0)
-        .sort((a, b) => Number(b.PJ) - Number(a.PJ))
-        .slice(0, topN)
-        .reverse(),
+        .filter(
+          (row) => Number(row.PJ) > 0
+        )
+        .sort(
+          (a, b) =>
+            Number(b.PJ) - Number(a.PJ)
+        )
+        .slice(0, topN),
     [porParticipante, topN]
   );
 
   const exportRows = useMemo(() => {
-    const exportPF = [...rowsPF]
-      .reverse()
-      .map((row, index) => ({
+    const exportPF = rowsPF.map(
+      (row, index) => ({
         Tipo: "Pessoa física",
         Ranking: index + 1,
         Participante: row.participante,
         Chaves: row.PF,
-      }));
+      })
+    );
 
-    const exportPJ = [...rowsPJ]
-      .reverse()
-      .map((row, index) => ({
+    const exportPJ = rowsPJ.map(
+      (row, index) => ({
         Tipo: "Pessoa jurídica",
         Ranking: index + 1,
         Participante: row.participante,
         Chaves: row.PJ,
-      }));
+      })
+    );
 
     return [...exportPF, ...exportPJ];
   }, [rowsPF, rowsPJ]);
 
-  const referenceDate = new Date(
-    `${data}T00:00:00`
-  ).toLocaleDateString("pt-BR");
+  const referenceDate = data
+    ? new Date(
+        `${data}T00:00:00`
+      ).toLocaleDateString("pt-BR")
+    : "último mês disponível";
 
   return (
     <ChartCard
@@ -161,7 +178,7 @@ export function ChavesPorParticipante({
       tabs={
         <CsvDownloadButton
           data={exportRows}
-          filename={`chaves-pix-por-participante-${data}.csv`}
+          filename={`chaves-pix-por-participante-${data ?? "ultimo-mes"}.csv`}
         />
       }
     >
@@ -170,14 +187,20 @@ export function ChavesPorParticipante({
           title="Pessoa física"
           rows={rowsPF}
           dataKey="PF"
-          color={categoryColor("porPFPJPagador", "PF")}
+          color={categoryColor(
+            "porPFPJPagador",
+            "PF"
+          )}
         />
 
         <ParticipantChart
           title="Pessoa jurídica"
           rows={rowsPJ}
           dataKey="PJ"
-          color={categoryColor("porPFPJPagador", "PJ")}
+          color={categoryColor(
+            "porPFPJPagador",
+            "PJ"
+          )}
         />
       </div>
 
@@ -215,12 +238,6 @@ export function ChavesPorParticipante({
             .participant-charts-grid {
               grid-template-columns: 1fr;
               gap: 32px;
-            }
-          }
-
-          @media (max-width: 640px) {
-            .participant-chart-panel .recharts-yAxis {
-              font-size: 10px;
             }
           }
         `}
