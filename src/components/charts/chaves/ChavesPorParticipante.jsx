@@ -19,13 +19,13 @@ import { categoryColor } from "../../../lib/categories";
 
 const TOPN_OPTIONS = [5, 10, 15, 20, 25];
 
-function barSizeForRowCount(rowCount) {
-  if (rowCount <= 3) return 44;
-  if (rowCount <= 6) return 34;
-  if (rowCount <= 10) return 26;
-  if (rowCount <= 15) return 20;
-  if (rowCount <= 20) return 16;
-  return 12;
+function chartHeightForRows(rowCount) {
+  return Math.max(200, rowCount * 32);
+}
+
+function barSizeForBand(rowCount, chartHeight) {
+  const bandHeight = chartHeight / Math.max(rowCount, 1);
+  return Math.round(Math.min(Math.max(bandHeight * 0.7, 16), 40));
 }
 
 function ParticipantChart({
@@ -34,12 +34,8 @@ function ParticipantChart({
   dataKey,
   color,
 }) {
-  const chartHeight = Math.max(
-    300,
-    rows.length * 40
-  );
-
-  const barSize = barSizeForRowCount(rows.length);
+  const chartHeight = chartHeightForRows(rows.length);
+  const barSize = barSizeForBand(rows.length, chartHeight);
 
   return (
     <section className="participant-chart-panel">
@@ -63,7 +59,7 @@ function ParticipantChart({
             left: 8,
             bottom: 0,
           }}
-          barCategoryGap="22%"
+          barCategoryGap="12%"
         >
           <CartesianGrid
             stroke="var(--gridline)"
