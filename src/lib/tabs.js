@@ -1,6 +1,6 @@
 export const TABS = [
-  { key: "dict", label: "Usuários Cadastrados (DICT)" },
-  { key: "chaves", label: "Chaves Pix" },
+  { key: "dict", label: "Usuários" },
+  { key: "chaves", label: "Chaves" },
   { key: "municipio", label: "Transações por Município" },
   { key: "transacoes", label: "Estatísticas de Transações" },
 ];
