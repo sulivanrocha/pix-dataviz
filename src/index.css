@@ -9,6 +9,11 @@
   --border: rgba(11, 11, 11, 0.1);
   --success: #006300;
 
+  /* FT-inspired glossary accent */
+  --ft-paper: #fff1e5;
+  --ft-claret: #990f3d;
+  --ft-rule: #d6c8b8;
+
   --series-1: #2a78d6; /* blue */
   --series-2: #1baf7a; /* aqua */
   --series-3: #eda100; /* yellow */
@@ -38,6 +43,11 @@
     --baseline: #383835;
     --border: rgba(255, 255, 255, 0.1);
     --success: #0ca30c;
+
+    /* FT-inspired glossary accent, dark mode */
+    --ft-paper: #241a16;
+    --ft-claret: #e0577e;
+    --ft-rule: #3a2f2a;
 
     --series-1: #3987e5;
     --series-2: #199e70;
@@ -348,4 +358,87 @@ body {
   padding: 40px;
   text-align: center;
   color: var(--text-secondary);
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,500&display=swap');
+
+.definitions-section {
+  background: var(--ft-paper);
+  color: var(--text-primary);
+  padding: 2.5rem clamp(1.25rem, 4vw, 3rem);
+  margin-top: 20px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.definitions-section .definitions-eyebrow {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ft-claret);
+  margin-bottom: 0.5rem;
+}
+
+.definitions-section h3 {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  font-size: clamp(1.5rem, 3vw, 1.9rem);
+  line-height: 1.15;
+  margin: 0 0 1.25rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 2px solid var(--text-primary);
+  position: relative;
+}
+
+.definitions-section h3::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -5px;
+  width: 100%;
+  border-bottom: 1px solid var(--text-primary);
+}
+
+.definitions-section dl {
+  margin: 0;
+  max-width: 68ch;
+}
+
+.definitions-item {
+  padding: 1.25rem 0;
+  border-bottom: 1px solid var(--ft-rule);
+}
+
+.definitions-item:first-of-type {
+  padding-top: 0.5rem;
+}
+
+.definitions-item:last-of-type {
+  border-bottom: none;
+}
+
+.definitions-item dt {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 600;
+  font-style: italic;
+  font-size: 1.05rem;
+  margin-bottom: 0.3rem;
+}
+
+.definitions-item dd {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .definitions-section {
+    padding: 1.75rem 1.1rem;
+  }
+  .definitions-item {
+    padding: 1rem 0;
+  }
 }
