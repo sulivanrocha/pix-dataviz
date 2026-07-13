@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { Filters } from "../components/shared/Filters";
 import { StatTile } from "../components/shared/StatTile";
 import { UsersGrowthChart } from "../components/charts/dict/UsersGrowthChart";
 import { formatAnoMes, formatNumberCompact } from "../lib/format";
@@ -86,17 +85,15 @@ export function UsuariosDictPage({ usuariosDict }) {
         />
       </section>
 
-      <Filters
-        months={months}
-        start={range.start}
-        end={range.end}
-        onStartChange={setStart}
-        onEndChange={setEnd}
-        hint="Filtra o gráfico de crescimento abaixo."
-      />
-
       <section className="charts-grid">
-        <UsersGrowthChart usuariosDict={filtered} />
+        <UsersGrowthChart
+          usuariosDict={filtered}
+          months={months}
+          start={range.start}
+          end={range.end}
+          onStartChange={setStart}
+          onEndChange={setEnd}
+        />
       </section>
 
       <section className="definitions-section">

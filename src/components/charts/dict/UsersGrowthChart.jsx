@@ -11,13 +11,21 @@ import {
 import { ChartCard } from "../../shared/ChartCard";
 import { ChartTooltip } from "../../shared/ChartTooltip";
 import { CsvDownloadButton } from "../../shared/CsvDownloadButton";
+import { Filters } from "../../shared/Filters";
 import {
   formatAnoMes,
   formatNumberCompact,
   formatNumberFull,
 } from "../../../lib/format";
 
-export function UsersGrowthChart({ usuariosDict }) {
+export function UsersGrowthChart({
+  usuariosDict,
+  months,
+  start,
+  end,
+  onStartChange,
+  onEndChange,
+}) {
   const rows = useMemo(
     () =>
       usuariosDict.map((r) => ({
@@ -40,28 +48,28 @@ export function UsersGrowthChart({ usuariosDict }) {
     [rows]
   );
 
-  const months = rows.length;
+  const monthCount = rows.length;
 
   const tickInterval = Math.max(
-    Math.ceil(months / 6) - 1,
+    Math.ceil(monthCount / 6) - 1,
     0
   );
 
   const barSize =
-    months <= 3
+    monthCount <= 3
       ? 56
-      : months <= 6
+      : monthCount <= 6
         ? 42
-        : months <= 12
+        : monthCount <= 12
           ? 28
-          : months <= 24
+          : monthCount <= 24
             ? 18
             : 12;
 
   const categoryGap =
-    months <= 6
+    monthCount <= 6
       ? "6%"
-      : months <= 12
+      : monthCount <= 12
         ? "12%"
         : "24%";
 
@@ -71,10 +79,20 @@ export function UsersGrowthChart({ usuariosDict }) {
       subtitle="Evolução mensal de pessoas físicas e jurídicas desde o lançamento do Pix"
       fullWidth
       tabs={
-        <CsvDownloadButton
-          data={exportRows}
-          filename="usuarios-dict.csv"
-        />
+        <div className="users-growth-controls">
+          <Filters
+            months={months}
+            start={start}
+            end={end}
+            onStartChange={onStartChange}
+            onEndChange={onEndChange}
+          />
+
+          <CsvDownloadButton
+            data={exportRows}
+            filename="usuarios-dict.csv"
+          />
+        </div>
       }
     >
       <div className="users-growth-grid">
@@ -239,6 +257,13 @@ export function UsersGrowthChart({ usuariosDict }) {
             margin: 0 0 12px;
             font-size: 14px;
             font-weight: 600;
+          }
+
+          .users-growth-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
           }
 
           @media (max-width: 800px) {
