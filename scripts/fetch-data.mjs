@@ -1,0 +1,208 @@
+// Baixa dados públicos da API do Pix (Banco Central) e gera snapshots
+// JSON estáticos em public/data/. Reexecute este script para atualizar
+// os dados exibidos no dashboard (não há fetch ao vivo no navegador).
+//
+// Uso: node scripts/fetch-data.mjs
+
+import { writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+const BASE = "https://olinda.bcb.gov.br/olinda/servico/Pix_DadosAbertos/versao/v1/odata";
+const OUT_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "public", "data");
+
+async function fetchAll(entity, functionParam) {
+  const url = `${BASE}/${entity}${functionParam ? `(${functionParam})` : ""}?$format=json&$top=500000`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${entity}: HTTP ${res.status}`);
+  const json = await res.json();
+  return json.value;
+}
+
+function round2(n) {
+  return Math.round(n * 100) / 100;
+}
+
+// --- Usuários cadastrados no DICT (já vem em granularidade mensal) ---
+async function buildUsuariosDict() {
+  const rows = await fetchAll("PixUsuariosCadastradosDICT");
+  rows.sort((a, b) => a.DataGraficosPix.localeCompare(b.DataGraficosPix));
+  return rows.map((r) => ({
+    data: r.DataGraficosPix,
+    pessoaFisica: r.qtdUsuariosPessoaFisica,
+    pessoaJuridica: r.qtdUsuariosPessoaJuridica,
+    total: r.qtdUsuariosCadastradosDICTTotal,
+  }));
+}
+
+// --- Estatísticas de transações Pix ---
+// Dataset bruto vem quebrado em várias dimensões (idade, forma de iniciação,
+// natureza, finalidade, região, PF/PJ) por mês, ~200k linhas. Agregamos em
+// cubos pequenos: total mensal + total mensal por categoria de cada dimensão.
+function aggregateBy(rows, keyFn) {
+  const map = new Map();
+  for (const r of rows) {
+    const key = keyFn(r);
+    const cur = map.get(key) ?? { VALOR: 0, QUANTIDADE: 0 };
+    cur.VALOR += r.VALOR ?? 0;
+    cur.QUANTIDADE += r.QUANTIDADE ?? 0;
+    map.set(key, cur);
+  }
+  return map;
+}
+
+async function buildTransacoes() {
+  const rows = await fetchAll("EstatisticasTransacoesPix", "Database=%27202505%27");
+
+  const mensalMap = aggregateBy(rows, (r) => r.AnoMes);
+  const mensal = [...mensalMap.entries()]
+    .map(([AnoMes, v]) => ({ AnoMes, VALOR: round2(v.VALOR), QUANTIDADE: v.QUANTIDADE }))
+    .sort((a, b) => a.AnoMes - b.AnoMes);
+
+  function porDimensao(field) {
+    const map = aggregateBy(rows, (r) => `${r.AnoMes}|${r[field] ?? "Não informado"}`);
+    return [...map.entries()]
+      .map(([key, v]) => {
+        const [AnoMes, categoria] = key.split("|");
+        return {
+          AnoMes: Number(AnoMes),
+          categoria,
+          VALOR: round2(v.VALOR),
+          QUANTIDADE: v.QUANTIDADE,
+        };
+      })
+      .sort((a, b) => a.AnoMes - b.AnoMes);
+  }
+
+  return {
+    mensal,
+    porRegiaoPagador: porDimensao("PAG_REGIAO"),
+    porPFPJPagador: porDimensao("PAG_PFPJ"),
+    porNatureza: porDimensao("NATUREZA"),
+    porFinalidade: porDimensao("FINALIDADE"),
+    porFormaIniciacao: porDimensao("FORMAINICIACAO"),
+  };
+}
+
+// --- Transações Pix por Município ---
+// Dataset bruto é por município (~5.5k) por mês (~83k linhas). Agregamos por
+// estado para viabilizar mapa/filtro sem enviar granularidade municipal.
+async function buildMunicipio() {
+  const rows = await fetchAll("TransacoesPixPorMunicipio", "DataBase=%27202505%27");
+
+  const map = new Map();
+  for (const r of rows) {
+    const key = `${r.AnoMes}|${r.Estado}`;
+    const cur = map.get(key) ?? {
+      Estado: r.Estado,
+      Estado_Ibge: r.Estado_Ibge,
+      Sigla_Regiao: r.Sigla_Regiao,
+      Regiao: r.Regiao,
+      VL_PagadorPF: 0,
+      QT_PagadorPF: 0,
+      VL_PagadorPJ: 0,
+      QT_PagadorPJ: 0,
+      VL_RecebedorPF: 0,
+      QT_RecebedorPF: 0,
+      VL_RecebedorPJ: 0,
+      QT_RecebedorPJ: 0,
+    };
+    cur.VL_PagadorPF += r.VL_PagadorPF ?? 0;
+    cur.QT_PagadorPF += r.QT_PagadorPF ?? 0;
+    cur.VL_PagadorPJ += r.VL_PagadorPJ ?? 0;
+    cur.QT_PagadorPJ += r.QT_PagadorPJ ?? 0;
+    cur.VL_RecebedorPF += r.VL_RecebedorPF ?? 0;
+    cur.QT_RecebedorPF += r.QT_RecebedorPF ?? 0;
+    cur.VL_RecebedorPJ += r.VL_RecebedorPJ ?? 0;
+    cur.QT_RecebedorPJ += r.QT_RecebedorPJ ?? 0;
+    map.set(key, cur);
+  }
+
+  const porEstadoMensal = [...map.entries()]
+    .map(([key, v]) => {
+      const [AnoMes] = key.split("|");
+      return {
+        AnoMes: Number(AnoMes),
+        Estado: v.Estado,
+        Estado_Ibge: v.Estado_Ibge,
+        Sigla_Regiao: v.Sigla_Regiao,
+        Regiao: v.Regiao,
+        VL_PagadorPF: round2(v.VL_PagadorPF),
+        QT_PagadorPF: v.QT_PagadorPF,
+        VL_PagadorPJ: round2(v.VL_PagadorPJ),
+        QT_PagadorPJ: v.QT_PagadorPJ,
+        VL_RecebedorPF: round2(v.VL_RecebedorPF),
+        QT_RecebedorPF: v.QT_RecebedorPF,
+        VL_RecebedorPJ: round2(v.VL_RecebedorPJ),
+        QT_RecebedorPJ: v.QT_RecebedorPJ,
+      };
+    })
+    .sort((a, b) => a.AnoMes - b.AnoMes || a.Estado.localeCompare(b.Estado));
+
+  return { porEstadoMensal };
+}
+
+// --- Estoque de Chaves Pix por Participante ---
+// A API exige uma data exata (Data=AAAA-MM-DD) e só tem estoque do último
+// dia de cada mês. Tenta os últimos meses até achar o mais recente publicado.
+function lastDayOfMonth(year, month) {
+  // new Date(Date.UTC(year, month, 0)) = dia 0 do mês seguinte = último dia do mês atual
+  return new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+}
+
+async function fetchLatestChaves() {
+  const now = new Date();
+  for (let i = 0; i < 6; i++) {
+    const year = now.getUTCFullYear();
+    const month = now.getUTCMonth() + 1 - i; // 1-indexado, pode ir < 1 (JS normaliza)
+    const data = lastDayOfMonth(year, month);
+    const rows = await fetchAll("ChavesPix", `Data=%27${data}%27`);
+    if (rows.length > 0) return { data, rows };
+  }
+  throw new Error("ChavesPix: nenhum estoque encontrado nos últimos 6 meses");
+}
+
+async function buildChavesPix() {
+  const { data, rows } = await fetchLatestChaves();
+
+  const map = new Map();
+  for (const r of rows) {
+    const cur = map.get(r.Nome) ?? { participante: r.Nome, PF: 0, PJ: 0 };
+    cur[r.NaturezaUsuario] = (cur[r.NaturezaUsuario] ?? 0) + r.qtdChaves;
+    map.set(r.Nome, cur);
+  }
+
+  const porParticipante = [...map.values()]
+    .map((v) => ({ ...v, total: v.PF + v.PJ }))
+    .sort((a, b) => b.total - a.total);
+
+  return { data, porParticipante };
+}
+
+async function main() {
+  console.log("Baixando Usuários cadastrados no DICT...");
+  const usuariosDict = await buildUsuariosDict();
+
+  console.log("Baixando Estatísticas de transações Pix (~200k linhas, pode levar ~30s)...");
+  const transacoes = await buildTransacoes();
+
+  console.log("Baixando Transações Pix por Município (~80k linhas, pode levar ~15s)...");
+  const municipio = await buildMunicipio();
+
+  console.log("Baixando Estoque de Chaves Pix por Participante...");
+  const chaves = await buildChavesPix();
+
+  const generatedAt = new Date().toISOString();
+
+  await writeFile(join(OUT_DIR, "usuarios_dict.json"), JSON.stringify({ generatedAt, dados: usuariosDict }));
+  await writeFile(join(OUT_DIR, "transacoes.json"), JSON.stringify({ generatedAt, ...transacoes }));
+  await writeFile(join(OUT_DIR, "municipio.json"), JSON.stringify({ generatedAt, ...municipio }));
+  await writeFile(join(OUT_DIR, "chaves.json"), JSON.stringify({ generatedAt, ...chaves }));
+
+  console.log(`OK. Arquivos gerados em ${OUT_DIR}`);
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
