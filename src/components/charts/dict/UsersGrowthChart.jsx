@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import {
-  AreaChart,
-  Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -21,11 +21,18 @@ export function UsersGrowthChart({ usuariosDict }) {
   const rows = useMemo(
     () =>
       usuariosDict.map((r) => ({
-        mes: formatAnoMes(Number(r.data.slice(0, 7).replace("-", ""))),
+        mes: formatAnoMes(
+          Number(r.data.slice(0, 7).replace("-", ""))
+        ),
         pessoaFisica: r.pessoaFisica,
         pessoaJuridica: r.pessoaJuridica,
       })),
     [usuariosDict]
+  );
+
+  const tickInterval = Math.max(
+    Math.ceil(rows.length / 9) - 1,
+    0
   );
 
   return (
@@ -34,39 +41,18 @@ export function UsersGrowthChart({ usuariosDict }) {
       subtitle="Evolução mensal de pessoas físicas e jurídicas desde o lançamento do Pix"
       fullWidth
     >
-      <ResponsiveContainer width="100%" height={320}>
-        <AreaChart
+      <ResponsiveContainer width="100%" height={340}>
+        <BarChart
           data={rows}
-          margin={{ top: 8, right: 16, left: 8, bottom: 0 }}
+          margin={{
+            top: 12,
+            right: 20,
+            left: 8,
+            bottom: 0,
+          }}
+          barGap={1}
+          barCategoryGap="20%"
         >
-          <defs>
-            <linearGradient id="pessoaFisicaGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop
-                offset="5%"
-                stopColor="var(--series-1)"
-                stopOpacity={0.75}
-              />
-              <stop
-                offset="95%"
-                stopColor="var(--series-1)"
-                stopOpacity={0.15}
-              />
-            </linearGradient>
-
-            <linearGradient id="pessoaJuridicaGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop
-                offset="5%"
-                stopColor="var(--series-2)"
-                stopOpacity={0.75}
-              />
-              <stop
-                offset="95%"
-                stopColor="var(--series-2)"
-                stopOpacity={0.15}
-              />
-            </linearGradient>
-          </defs>
-
           <CartesianGrid
             stroke="var(--gridline)"
             vertical={false}
@@ -82,24 +68,39 @@ export function UsersGrowthChart({ usuariosDict }) {
               stroke: "var(--baseline)",
             }}
             tickLine={false}
-            interval={Math.max(Math.ceil(rows.length / 9) - 1, 0)}
+            interval={tickInterval}
           />
 
           <YAxis
+            yAxisId="pf"
+            orientation="left"
             tick={{
               fontSize: 11,
-              fill: "var(--text-muted)",
+              fill: "var(--series-1)",
             }}
             axisLine={false}
             tickLine={false}
-            width={48}
+            width={52}
+            tickFormatter={formatNumberCompact}
+          />
+
+          <YAxis
+            yAxisId="pj"
+            orientation="right"
+            tick={{
+              fontSize: 11,
+              fill: "var(--series-2)",
+            }}
+            axisLine={false}
+            tickLine={false}
+            width={52}
             tickFormatter={formatNumberCompact}
           />
 
           <Tooltip
             cursor={{
-              stroke: "var(--baseline)",
-              strokeWidth: 1,
+              fill: "var(--gridline)",
+              opacity: 0.35,
             }}
             content={
               <ChartTooltip
@@ -109,7 +110,12 @@ export function UsersGrowthChart({ usuariosDict }) {
           />
 
           <Legend
-            wrapperStyle={{ fontSize: 12 }}
+            verticalAlign="top"
+            align="left"
+            wrapperStyle={{
+              fontSize: 12,
+              paddingBottom: 16,
+            }}
             formatter={(value) => (
               <span
                 style={{
@@ -122,28 +128,26 @@ export function UsersGrowthChart({ usuariosDict }) {
             itemSorter={() => 0}
           />
 
-          <Area
-            type="monotone"
+          <Bar
+            yAxisId="pf"
             dataKey="pessoaFisica"
-            name="Pessoa física"
-            stackId="usuarios"
-            stroke="var(--series-1)"
-            fill="url(#pessoaFisicaGradient)"
-            strokeWidth={2}
-            activeDot={{ r: 4 }}
+            name="Pessoa física — eixo esquerdo"
+            fill="var(--series-1)"
+            radius={[3, 3, 0, 0]}
+            maxBarSize={12}
+            animationDuration={700}
           />
 
-          <Area
-            type="monotone"
+          <Bar
+            yAxisId="pj"
             dataKey="pessoaJuridica"
-            name="Pessoa jurídica"
-            stackId="usuarios"
-            stroke="var(--series-2)"
-            fill="url(#pessoaJuridicaGradient)"
-            strokeWidth={2}
-            activeDot={{ r: 4 }}
+            name="Pessoa jurídica — eixo direito"
+            fill="var(--series-2)"
+            radius={[3, 3, 0, 0]}
+            maxBarSize={12}
+            animationDuration={700}
           />
-        </AreaChart>
+        </BarChart>
       </ResponsiveContainer>
     </ChartCard>
   );
