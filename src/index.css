@@ -289,6 +289,10 @@ input:focus {
   gap: 12px;
 }
 
+.charts-grid + .charts-grid {
+  margin-top: 32px;
+}
+
 .chart-card {
   background: var(--surface-1);
   border: 1px solid var(--border);
@@ -483,4 +487,25 @@ input:focus {
   .definitions-item {
     padding: 10px 0;
   }
+}
+
+.filters-cascade {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.filters-cascade-selects {
+  display: flex;
+  gap: 6px;
+}
+
+.filters-cascade-selects select:first-child {
+  width: 78px;
+}
+
+.filters-cascade-selects select:last-child {
+  width: 70px;
 }
