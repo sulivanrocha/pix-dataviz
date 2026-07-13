@@ -17,6 +17,17 @@ import {
 } from "../../../lib/format";
 import { categoryColor } from "../../../lib/categories";
 
+const TOPN_OPTIONS = [5, 10, 15, 20, 25];
+
+function barSizeForRowCount(rowCount) {
+  if (rowCount <= 3) return 44;
+  if (rowCount <= 6) return 34;
+  if (rowCount <= 10) return 26;
+  if (rowCount <= 15) return 20;
+  if (rowCount <= 20) return 16;
+  return 12;
+}
+
 function ParticipantChart({
   title,
   rows,
@@ -27,6 +38,8 @@ function ParticipantChart({
     300,
     rows.length * 40
   );
+
+  const barSize = barSizeForRowCount(rows.length);
 
   return (
     <section className="participant-chart-panel">
@@ -100,7 +113,7 @@ function ParticipantChart({
             name="Número de chaves"
             fill={color}
             radius={[0, 4, 4, 0]}
-            maxBarSize={24}
+            barSize={barSize}
             animationDuration={700}
           />
         </BarChart>
@@ -113,6 +126,7 @@ export function ChavesPorParticipante({
   data,
   porParticipante,
   topN = 5,
+  onTopNChange,
 }) {
   const rowsPF = useMemo(
     () =>
@@ -176,10 +190,32 @@ export function ChavesPorParticipante({
       subtitle={`Estoque em ${referenceDate}, com rankings separados para pessoas físicas e jurídicas`}
       fullWidth
       tabs={
-        <CsvDownloadButton
-          data={exportRows}
-          filename={`chaves-pix-por-participante-${data ?? "ultimo-mes"}.csv`}
-        />
+        <div className="participant-chart-controls">
+          <label className="participant-chart-topn">
+            Top N
+
+            <select
+              value={topN}
+              onChange={(event) =>
+                onTopNChange?.(Number(event.target.value))
+              }
+            >
+              {TOPN_OPTIONS.map((option) => (
+                <option
+                  key={option}
+                  value={option}
+                >
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <CsvDownloadButton
+            data={exportRows}
+            filename={`chaves-pix-por-participante-${data ?? "ultimo-mes"}.csv`}
+          />
+        </div>
       }
     >
       <div className="participant-charts-grid">
@@ -232,6 +268,31 @@ export function ChavesPorParticipante({
             text-align: center;
             color: var(--text-muted);
             font-size: 12px;
+          }
+
+          .participant-chart-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+          }
+
+          .participant-chart-topn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+          }
+
+          .participant-chart-topn select {
+            font: inherit;
+            font-size: 13px;
+            color: var(--text-primary);
+            background: var(--page);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 4px 6px;
           }
 
           @media (max-width: 1000px) {

@@ -7,8 +7,6 @@ import {
   formatNumberCompact,
 } from "../lib/format";
 
-const TOPN_OPTIONS = [5, 10, 15, 20, 25];
-
 function getTimestamp(date) {
   if (!date) return 0;
 
@@ -116,37 +114,12 @@ export function ChavesPixPage({ chaves }) {
         </section>
       )}
 
-      <div className="filters-row">
-        <label>
-          Top N participantes
-
-          <select
-            value={topN}
-            onChange={(event) =>
-              setTopN(Number(event.target.value))
-            }
-          >
-            {TOPN_OPTIONS.map((option) => (
-              <option
-                key={option}
-                value={option}
-              >
-                {option}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <span className="filters-hint">
-          Estoque no último mês disponível, com rankings separados para PF e PJ.
-        </span>
-      </div>
-
       <section className="charts-grid">
         <ChavesPorParticipante
           data={latestRecord?.data ?? chaves.data}
           porParticipante={chaves.porParticipante}
           topN={topN}
+          onTopNChange={setTopN}
         />
       </section>
     </>
