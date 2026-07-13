@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import { ChartCard } from "../../shared/ChartCard";
 import { ChartTooltip } from "../../shared/ChartTooltip";
+import { CsvDownloadButton } from "../../shared/CsvDownloadButton";
 import {
   formatAnoMes,
   formatNumberCompact,
@@ -27,6 +28,16 @@ export function UsersGrowthChart({ usuariosDict }) {
         pessoaJuridica: r.pessoaJuridica,
       })),
     [usuariosDict]
+  );
+
+  const exportRows = useMemo(
+    () =>
+      rows.map((row) => ({
+        Mes: row.mes,
+        "Pessoa física": row.pessoaFisica,
+        "Pessoa jurídica": row.pessoaJuridica,
+      })),
+    [rows]
   );
 
   const months = rows.length;
@@ -59,6 +70,12 @@ export function UsersGrowthChart({ usuariosDict }) {
       title="Usuários cadastrados no DICT"
       subtitle="Evolução mensal de pessoas físicas e jurídicas desde o lançamento do Pix"
       fullWidth
+      tabs={
+        <CsvDownloadButton
+          data={exportRows}
+          filename="usuarios-dict.csv"
+        />
+      }
     >
       <div className="users-growth-grid">
         <section className="users-growth-panel">
