@@ -11,12 +11,26 @@ import { dirname, join } from "node:path";
 const BASE = "https://olinda.bcb.gov.br/olinda/servico/Pix_DadosAbertos/versao/v1/odata";
 const OUT_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "public", "data");
 
-async function fetchAll(entity, functionParam) {
-  const url = `${BASE}/${entity}${functionParam ? `(${functionParam})` : ""}?$format=json&$top=500000`;
+// A API ignora o parâmetro de data das funções (Database/DataBase/Data) para fins
+// de filtro — ele é obrigatório na assinatura, mas sempre retorna o histórico
+// completo (desde o lançamento do Pix, nov/2020). $top é o único limite real, e
+// como as linhas não vêm ordenadas cronologicamente, um $top baixo demais corta
+// uma fatia proporcional de TODOS os meses (não só os mais recentes) — foi assim
+// que o snapshot anterior acabou só com dados de mai/2025 em diante. Por isso o
+// default é alto o suficiente para nunca truncar (dataset atual: ~715k linhas em
+// EstatisticasTransacoesPix, ~385k em TransacoesPixPorMunicipio).
+const DEFAULT_TOP = 500000;
+
+async function fetchAll(entity, functionParam, top = DEFAULT_TOP) {
+  const url = `${BASE}/${entity}${functionParam ? `(${functionParam})` : ""}?$format=json&$top=${top}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${entity}: HTTP ${res.status}`);
   const json = await res.json();
-  return json.value;
+  const rows = json.value;
+  if (rows.length === top) {
+    console.warn(`${entity}: retornou exatamente $top=${top} linhas — pode estar truncado, considere aumentar o limite.`);
+  }
+  return rows;
 }
 
 function round2(n) {
@@ -52,7 +66,7 @@ function aggregateBy(rows, keyFn) {
 }
 
 async function buildTransacoes() {
-  const rows = await fetchAll("EstatisticasTransacoesPix", "Database=%27202505%27");
+  const rows = await fetchAll("EstatisticasTransacoesPix", "Database=%27202001%27", 1500000);
 
   const mensalMap = aggregateBy(rows, (r) => r.AnoMes);
   const mensal = [...mensalMap.entries()]
@@ -88,7 +102,7 @@ async function buildTransacoes() {
 // Dataset bruto é por município (~5.5k) por mês (~83k linhas). Agregamos por
 // estado para viabilizar mapa/filtro sem enviar granularidade municipal.
 async function buildMunicipio() {
-  const rows = await fetchAll("TransacoesPixPorMunicipio", "DataBase=%27202505%27");
+  const rows = await fetchAll("TransacoesPixPorMunicipio", "DataBase=%27202001%27", 800000);
 
   const map = new Map();
   for (const r of rows) {
@@ -183,10 +197,10 @@ async function main() {
   console.log("Baixando Usuários cadastrados no DICT...");
   const usuariosDict = await buildUsuariosDict();
 
-  console.log("Baixando Estatísticas de transações Pix (~200k linhas, pode levar ~30s)...");
+  console.log("Baixando Estatísticas de transações Pix (~700k linhas, histórico completo desde nov/2020, pode levar ~1min)...");
   const transacoes = await buildTransacoes();
 
-  console.log("Baixando Transações Pix por Município (~80k linhas, pode levar ~15s)...");
+  console.log("Baixando Transações Pix por Município (~400k linhas, histórico completo desde nov/2020, pode levar ~30s)...");
   const municipio = await buildMunicipio();
 
   console.log("Baixando Estoque de Chaves Pix por Participante...");

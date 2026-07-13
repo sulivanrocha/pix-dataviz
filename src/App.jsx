@@ -1,32 +1,15 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { usePixData } from "./lib/usePixData";
-import { formatAnoMes, formatCurrencyCompact, formatCurrencyFull, formatNumberCompact } from "./lib/format";
-import { Filters } from "./components/Filters";
-import { StatTile } from "./components/StatTile";
-import { TrendChart } from "./components/TrendChart";
-import { CategoryBreakdown } from "./components/CategoryBreakdown";
-import { UsersGrowthChart } from "./components/UsersGrowthChart";
-import { StateRanking } from "./components/StateRanking";
-import { ChavesPorParticipante } from "./components/ChavesPorParticipante";
-
-function pctDelta(current, previous) {
-  if (!previous) return null;
-  return ((current - previous) / previous) * 100;
-}
+import { TabNav } from "./components/TabNav";
+import { TABS } from "./lib/tabs";
+import { UsuariosDictPage } from "./pages/UsuariosDictPage";
+import { ChavesPixPage } from "./pages/ChavesPixPage";
+import { TransacoesMunicipioPage } from "./pages/TransacoesMunicipioPage";
+import { EstatisticasTransacoesPage } from "./pages/EstatisticasTransacoesPage";
 
 function App() {
   const { status, data, error } = usePixData();
-  const months = useMemo(
-    () => (data ? [...new Set(data.transacoes.mensal.map((r) => r.AnoMes))].sort() : []),
-    [data]
-  );
-  const [start, setStart] = useState(null);
-  const [end, setEnd] = useState(null);
-
-  const range = {
-    start: start ?? months[0],
-    end: end ?? months[months.length - 1],
-  };
+  const [tab, setTab] = useState(TABS[0].key);
 
   if (status === "loading") {
     return <p className="state-message">Carregando dados do Pix...</p>;
@@ -44,11 +27,6 @@ function App() {
   }
 
   const { transacoes, usuariosDict, municipio, chaves } = data;
-  const mensal = transacoes.mensal;
-  const latest = mensal[mensal.length - 1];
-  const previous = mensal[mensal.length - 2];
-  const dictLatest = usuariosDict.dados[usuariosDict.dados.length - 1];
-  const dictPrevious = usuariosDict.dados[usuariosDict.dados.length - 2];
 
   return (
     <>
@@ -60,37 +38,12 @@ function App() {
         </p>
       </header>
 
-      <Filters months={months} start={range.start} end={range.end} onStartChange={setStart} onEndChange={setEnd} />
+      <TabNav active={tab} onChange={setTab} />
 
-      <section className="kpi-row">
-        <StatTile
-          label={`Valor transacionado (${formatAnoMes(latest.AnoMes)})`}
-          value={formatCurrencyCompact(latest.VALOR)}
-          delta={pctDelta(latest.VALOR, previous?.VALOR)}
-        />
-        <StatTile
-          label={`Transações liquidadas (${formatAnoMes(latest.AnoMes)})`}
-          value={formatNumberCompact(latest.QUANTIDADE)}
-          delta={pctDelta(latest.QUANTIDADE, previous?.QUANTIDADE)}
-        />
-        <StatTile
-          label="Ticket médio"
-          value={formatCurrencyFull(latest.VALOR / latest.QUANTIDADE)}
-        />
-        <StatTile
-          label="Usuários cadastrados no DICT"
-          value={formatNumberCompact(dictLatest.total)}
-          delta={pctDelta(dictLatest.total, dictPrevious?.total)}
-        />
-      </section>
-
-      <section className="charts-grid">
-        <TrendChart mensal={mensal} start={range.start} end={range.end} />
-        <CategoryBreakdown transacoes={transacoes} start={range.start} end={range.end} />
-        <UsersGrowthChart usuariosDict={usuariosDict.dados} />
-        <StateRanking porEstadoMensal={municipio.porEstadoMensal} start={range.start} end={range.end} />
-        <ChavesPorParticipante data={chaves.data} porParticipante={chaves.porParticipante} />
-      </section>
+      {tab === "dict" && <UsuariosDictPage usuariosDict={usuariosDict.dados} />}
+      {tab === "chaves" && <ChavesPixPage chaves={chaves} />}
+      {tab === "municipio" && <TransacoesMunicipioPage municipio={municipio} />}
+      {tab === "transacoes" && <EstatisticasTransacoesPage transacoes={transacoes} />}
 
       <footer className="app-footer">
         Fonte: API pública de{" "}

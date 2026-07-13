@@ -1,6 +1,6 @@
 import { formatAnoMes } from "../lib/format";
 
-export function Filters({ months, start, end, onStartChange, onEndChange }) {
+export function Filters({ months, start, end, onStartChange, onEndChange, hint, children }) {
   return (
     <div className="filters-row">
       <label>
@@ -27,9 +27,8 @@ export function Filters({ months, start, end, onStartChange, onEndChange }) {
             ))}
         </select>
       </label>
-      <span className="filters-hint">
-        Filtra os gráficos de transações, categorias e estados abaixo.
-      </span>
+      {children}
+      {hint && <span className="filters-hint">{hint}</span>}
     </div>
   );
 }

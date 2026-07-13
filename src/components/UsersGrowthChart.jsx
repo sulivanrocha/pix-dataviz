@@ -21,6 +21,7 @@ export function UsersGrowthChart({ usuariosDict }) {
     <ChartCard
       title="Usuários cadastrados no DICT"
       subtitle="Estoque mensal, desde o lançamento do Pix (histórico completo)"
+      fullWidth
     >
       <ResponsiveContainer width="100%" height={280}>
         <LineChart data={rows} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>

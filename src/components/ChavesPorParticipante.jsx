@@ -7,22 +7,24 @@ import { ChartTooltip } from "./ChartTooltip";
 import { formatNumberCompact, formatNumberFull } from "../lib/format";
 import { categoryLabel, categoryColor } from "../lib/categories";
 
-const TOP_N = 10;
+const TIPO_LABEL = { total: "pessoa física e jurídica", PF: "pessoa física", PJ: "pessoa jurídica" };
 
-export function ChavesPorParticipante({ data, porParticipante }) {
+export function ChavesPorParticipante({ data, porParticipante, topN = 10, tipo = "total" }) {
+  const sortKey = tipo === "total" ? "total" : tipo;
+
   const rows = useMemo(
     () =>
       [...porParticipante]
-        .sort((a, b) => b.total - a.total)
-        .slice(0, TOP_N)
+        .sort((a, b) => b[sortKey] - a[sortKey])
+        .slice(0, topN)
         .reverse(),
-    [porParticipante]
+    [porParticipante, sortKey, topN]
   );
 
   return (
     <ChartCard
-      title={`Top ${TOP_N} participantes por chaves Pix cadastradas`}
-      subtitle={`Estoque em ${new Date(data + "T00:00:00").toLocaleDateString("pt-BR")}, aberto por pessoa física e jurídica`}
+      title={`Top ${topN} participantes por chaves Pix cadastradas`}
+      subtitle={`Estoque em ${new Date(data + "T00:00:00").toLocaleDateString("pt-BR")}, aberto por ${TIPO_LABEL[tipo]}`}
       fullWidth
     >
       <ResponsiveContainer width="100%" height={360}>
@@ -52,8 +54,24 @@ export function ChavesPorParticipante({ data, porParticipante }) {
             formatter={(value) => <span style={{ color: "var(--text-secondary)" }}>{value}</span>}
             itemSorter={() => 0}
           />
-          <Bar dataKey="PF" name={categoryLabel("porPFPJPagador", "PF")} stackId="chaves" fill={categoryColor("porPFPJPagador", "PF")} />
-          <Bar dataKey="PJ" name={categoryLabel("porPFPJPagador", "PJ")} stackId="chaves" fill={categoryColor("porPFPJPagador", "PJ")} radius={[0, 4, 4, 0]} />
+          {tipo !== "PJ" && (
+            <Bar
+              dataKey="PF"
+              name={categoryLabel("porPFPJPagador", "PF")}
+              stackId="chaves"
+              fill={categoryColor("porPFPJPagador", "PF")}
+              radius={tipo === "PF" ? [0, 4, 4, 0] : 0}
+            />
+          )}
+          {tipo !== "PF" && (
+            <Bar
+              dataKey="PJ"
+              name={categoryLabel("porPFPJPagador", "PJ")}
+              stackId="chaves"
+              fill={categoryColor("porPFPJPagador", "PJ")}
+              radius={[0, 4, 4, 0]}
+            />
+          )}
         </BarChart>
       </ResponsiveContainer>
       <p style={{ textAlign: "center", fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>

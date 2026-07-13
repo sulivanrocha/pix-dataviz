@@ -12,9 +12,11 @@ function toTitleCase(s) {
   return s.replace(/\S+/g, (w) => w[0] + w.slice(1).toLowerCase());
 }
 
-export function StateRanking({ porEstadoMensal, start, end }) {
+export function StateRanking({ porEstadoMensal, start, end, regiao = "Todas" }) {
   const rows = useMemo(() => {
-    const filtered = porEstadoMensal.filter((r) => r.AnoMes >= start && r.AnoMes <= end);
+    const filtered = porEstadoMensal.filter(
+      (r) => r.AnoMes >= start && r.AnoMes <= end && (regiao === "Todas" || r.Regiao === regiao)
+    );
     const byState = new Map();
     for (const r of filtered) {
       const valorPago = r.VL_PagadorPF + r.VL_PagadorPJ;
@@ -25,7 +27,7 @@ export function StateRanking({ porEstadoMensal, start, end }) {
       .sort((a, b) => b.valor - a.valor)
       .slice(0, TOP_N)
       .reverse();
-  }, [porEstadoMensal, start, end]);
+  }, [porEstadoMensal, start, end, regiao]);
 
   return (
     <ChartCard
