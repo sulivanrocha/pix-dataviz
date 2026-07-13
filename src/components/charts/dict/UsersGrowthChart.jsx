@@ -29,10 +29,30 @@ export function UsersGrowthChart({ usuariosDict }) {
     [usuariosDict]
   );
 
+  const months = rows.length;
+
   const tickInterval = Math.max(
-    Math.ceil(rows.length / 6) - 1,
+    Math.ceil(months / 6) - 1,
     0
   );
+
+  const barSize =
+    months <= 3
+      ? 56
+      : months <= 6
+        ? 42
+        : months <= 12
+          ? 28
+          : months <= 24
+            ? 18
+            : 12;
+
+  const categoryGap =
+    months <= 6
+      ? "6%"
+      : months <= 12
+        ? "12%"
+        : "24%";
 
   return (
     <ChartCard
@@ -58,7 +78,7 @@ export function UsersGrowthChart({ usuariosDict }) {
                 left: 4,
                 bottom: 0,
               }}
-              barCategoryGap="24%"
+              barCategoryGap={categoryGap}
             >
               <CartesianGrid
                 stroke="var(--gridline)"
@@ -106,7 +126,7 @@ export function UsersGrowthChart({ usuariosDict }) {
                 name="Pessoa física"
                 fill="var(--series-1)"
                 radius={[3, 3, 0, 0]}
-                maxBarSize={14}
+                barSize={barSize}
                 animationDuration={700}
               />
             </BarChart>
@@ -130,7 +150,7 @@ export function UsersGrowthChart({ usuariosDict }) {
                 left: 4,
                 bottom: 0,
               }}
-              barCategoryGap="24%"
+              barCategoryGap={categoryGap}
             >
               <CartesianGrid
                 stroke="var(--gridline)"
@@ -178,7 +198,7 @@ export function UsersGrowthChart({ usuariosDict }) {
                 name="Pessoa jurídica"
                 fill="var(--series-2)"
                 radius={[3, 3, 0, 0]}
-                maxBarSize={14}
+                barSize={barSize}
                 animationDuration={700}
               />
             </BarChart>
