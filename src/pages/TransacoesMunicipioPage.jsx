@@ -39,7 +39,7 @@ function quantidadeFields(perspectiva, segmento) {
 
 export function TransacoesMunicipioPage({ municipio }) {
   const months = useMemo(
-    () => [...new Set(municipio.porEstadoMensal.map((r) => r.AnoMes))].sort(),
+    () => [...new Set(municipio.porEstadoMensal.map((r) => r.AnoMes))].sort((a, b) => a - b),
     [municipio]
   );
   const [start, setStart] = useState(null);
@@ -86,7 +86,10 @@ export function TransacoesMunicipioPage({ municipio }) {
       <section className="kpi-row">
         <StatTile label={`Valor ${perspectivaLabel} no período`} value={formatCurrencyCompact(totals.valor)} />
         <StatTile label={`Transações (${perspectivaLabel}s) no período`} value={formatNumberCompact(totals.quantidade)} />
-        <StatTile label="Ticket médio" value={formatCurrencyFull(totals.valor / totals.quantidade)} />
+        <StatTile
+          label="Ticket médio"
+          value={totals.quantidade > 0 ? formatCurrencyFull(totals.valor / totals.quantidade) : "—"}
+        />
       </section>
 
       <Filters

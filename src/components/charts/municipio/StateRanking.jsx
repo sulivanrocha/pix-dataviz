@@ -30,9 +30,8 @@ export function StateRanking({
   perspectiva = "Pagador",
   segmento = "Todos",
 }) {
-  const fields = valorFields(perspectiva, segmento);
-
   const rows = useMemo(() => {
+    const fields = valorFields(perspectiva, segmento);
     const filtered = porEstadoMensal.filter(
       (r) => r.AnoMes >= start && r.AnoMes <= end && (regiao === "Todas" || r.Regiao === regiao)
     );
@@ -45,7 +44,7 @@ export function StateRanking({
       .map(([estado, valor]) => ({ estado: toTitleCase(estado), valor }))
       .sort((a, b) => b.valor - a.valor)
       .slice(0, TOP_N);
-  }, [porEstadoMensal, start, end, regiao, fields.join(",")]);
+  }, [porEstadoMensal, start, end, regiao, perspectiva, segmento]);
 
   return (
     <ChartCard

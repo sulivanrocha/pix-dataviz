@@ -24,6 +24,18 @@ function mesToAnoMes(mes) {
   return Number(mes.replace("-", ""));
 }
 
+// Monta as linhas do gráfico de um painel (PF ou PJ) para os meses visíveis.
+// Função pura no nível do módulo para não recriar a cada render.
+function buildRows(panel, visibleIndices, meses) {
+  return visibleIndices.map((i) => {
+    const row = { mes: formatAnoMes(mesToAnoMes(meses[i])) };
+    for (const nome of panel.participantes) {
+      row[nome] = panel.series[nome]?.[i] ?? 0;
+    }
+    return row;
+  });
+}
+
 function Panel({ title, color, participantes, rows, colorFor }) {
   return (
     <section className="top-serie-panel">
@@ -125,17 +137,8 @@ export function ChavesTopParticipantesSerie({
     [meses, start, end]
   );
 
-  const buildRows = (panel) =>
-    visibleIndices.map((i) => {
-      const row = { mes: formatAnoMes(mesToAnoMes(meses[i])) };
-      for (const nome of panel.participantes) {
-        row[nome] = panel.series[nome]?.[i] ?? 0;
-      }
-      return row;
-    });
-
-  const rowsPF = useMemo(() => buildRows(PF), [PF, visibleIndices, meses]);
-  const rowsPJ = useMemo(() => buildRows(PJ), [PJ, visibleIndices, meses]);
+  const rowsPF = useMemo(() => buildRows(PF, visibleIndices, meses), [PF, visibleIndices, meses]);
+  const rowsPJ = useMemo(() => buildRows(PJ, visibleIndices, meses), [PJ, visibleIndices, meses]);
 
   const exportRows = useMemo(() => {
     const out = [];

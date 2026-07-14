@@ -165,6 +165,12 @@ function buildMunicipiosDetalhado(rows) {
   const porEstadoMap = new Map();
 
   for (const r of rows) {
+    // Linhas sem município identificado (Municipio_Ibge nulo, Estado "NAO
+    // INFORMADO") ficam fora do cubo municipal — elas geravam um null.json e
+    // um registro inválido no índice. Continuam contabilizadas no agregado
+    // por estado (buildMunicipio), então nenhum total se perde.
+    if (r.Municipio_Ibge == null || r.Estado_Ibge == null) continue;
+
     if (!indexMap.has(r.Municipio_Ibge)) {
       indexMap.set(r.Municipio_Ibge, {
         ibge: r.Municipio_Ibge,
