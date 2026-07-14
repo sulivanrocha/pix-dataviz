@@ -161,6 +161,8 @@ export function TransacoesMunicipioPage({ municipio }) {
           porEstadoMensal={municipio.porEstadoMensal}
           regiao={selecaoMunicipio.regiao}
           estadoIbge={selecaoMunicipio.estadoIbge}
+          municipio={selecaoMunicipio.municipio}
+          serieMunicipio={serieMunicipio}
         />
       </section>
 
