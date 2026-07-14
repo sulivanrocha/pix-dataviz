@@ -44,12 +44,12 @@ function App() {
         <div className="app-header__meta">
           <span className="app-header__author">
             Projeto independente por{" "}
-            <a href="https://github.com/sulivanrocha" target="_blank" rel="noreferrer">
+            <a href="https://www.linkedin.com/in/sulivanrocha/" target="_blank" rel="noreferrer">
               Sulivan Rocha
             </a>
           </span>
           <span className="app-header__disclaimer">
-            Não é um serviço oficial do Banco Central. Apenas os dados são de fonte oficial.
+            Não é um serviço oficial do Banco Central.
           </span>
         </div>
       </header>
