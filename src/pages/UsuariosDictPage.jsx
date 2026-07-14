@@ -69,17 +69,17 @@ export function UsuariosDictPage({ usuariosDict }) {
     <>
       <section className="kpi-row">
         <StatTile
-          label={`Usuários cadastrados no DICT (total) · ${referenceMonth}`}
+          label={`Usuários cadastrados no DICT - ${referenceMonth}`}
           value={formatNumberCompact(latest.total)}
           delta={pctDelta(latest.total, previous?.total)}
         />
         <StatTile
-          label={`Pessoa física · ${referenceMonth}`}
+          label={`Pessoa física - ${referenceMonth}`}
           value={formatNumberCompact(latest.pessoaFisica)}
           delta={pctDelta(latest.pessoaFisica, previous?.pessoaFisica)}
         />
         <StatTile
-          label={`Pessoa jurídica · ${referenceMonth}`}
+          label={`Pessoa jurídica - ${referenceMonth}`}
           value={formatNumberCompact(latest.pessoaJuridica)}
           delta={pctDelta(latest.pessoaJuridica, previous?.pessoaJuridica)}
         />

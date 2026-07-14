@@ -3,7 +3,7 @@ const RESOURCES = [
     tab: "Usuários",
     question: "Quantas pessoas e empresas já têm Pix?",
     description:
-      "Estoque mensal de usuários pessoa física e jurídica cadastrados no DICT — o diretório que vincula chaves Pix a contas transacionais. Mostra a adoção do Pix ao longo do tempo, desde 2020.",
+      "Estoque mensal de usuários pessoa física e jurídica cadastrados no DICT - o diretório que vincula chaves Pix a contas transacionais. Mostra a adoção do Pix ao longo do tempo, desde 2020.",
   },
   {
     tab: "Chaves",
@@ -32,15 +32,11 @@ export function OverviewPage() {
         <span className="overview-intro__eyebrow">Visão geral</span>
         <h2>O que você encontra neste painel</h2>
         <p>
-          Este é um projeto independente que reúne, em um só lugar, as principais estatísticas
-          públicas do Pix divulgadas pelo Banco Central do Brasil. Os números vêm da API de dados
-          abertos do BC, mas as visualizações, os recortes e a interface são de autoria própria — não
-          se trata de um canal oficial do Banco Central.
+          Este é um projeto independente que reúne, em um só lugar, as principais estatísticas públicas do Pix divulgadas pelo Banco Central do Brasil. Os números vêm da API de dados abertos do BC, mas as visualizações, os recortes e a interface são de autoria própria — não se trata de um canal oficial do Banco Central.
         </p>
         <p>
           Os dados são servidos como um snapshot estático, gerado periodicamente a partir da API.
-          Cada aba abaixo corresponde a um conjunto de dados diferente. Comece pela pergunta que você
-          quer responder.
+          Cada aba abaixo corresponde a um conjunto de dados diferente. Comece pela pergunta que você quer responder.
         </p>
       </section>
 
