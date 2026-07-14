@@ -134,7 +134,7 @@ export function MunicipioSelector({ onChange = () => {} }) {
   const indexPronto = indexStatus === "ready";
 
   return (
-    <div className="filters-row municipio-selector">
+    <div className="municipio-selector">
       <label>
         Região
         <select

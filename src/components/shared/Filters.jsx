@@ -82,19 +82,25 @@ export function Filters({ months, start, end, onStartChange, onEndChange, hint, 
 
   return (
     <div className="filters-row">
-      <CascadingMonthSelect
-        label="De"
-        value={start}
-        options={startOptions}
-        onChange={onStartChange}
-      />
+      {/*
+        De e Até ficam empilhados verticalmente para
+        reforçar que formam um único intervalo de período.
+      */}
+      <div className="filters-period">
+        <CascadingMonthSelect
+          label="De"
+          value={start}
+          options={startOptions}
+          onChange={onStartChange}
+        />
 
-      <CascadingMonthSelect
-        label="Até"
-        value={end}
-        options={endOptions}
-        onChange={onEndChange}
-      />
+        <CascadingMonthSelect
+          label="Até"
+          value={end}
+          options={endOptions}
+          onChange={onEndChange}
+        />
+      </div>
 
       {children}
       {hint && <span className="filters-hint">{hint}</span>}
