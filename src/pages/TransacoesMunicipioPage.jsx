@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Filters } from "../components/shared/Filters";
 import { StatTile } from "../components/shared/StatTile";
 import { StateRanking } from "../components/charts/municipio/StateRanking";
+import { RegiaoSummaryChart } from "../components/charts/municipio/RegiaoSummaryChart";
 import { MunicipioSelector } from "../components/MunicipioSelector";
 import { MunicipioPFPJChart } from "../components/MunicipioPFPJChart";
 import { formatCurrencyCompact, formatCurrencyFull, formatNumberCompact } from "../lib/format";
@@ -27,16 +28,12 @@ const SEGMENTOS = [
 ];
 
 function valorFields(perspectiva, segmento) {
-  if (segmento === "Todos") {
-    return [`VL_${perspectiva}PF`, `VL_${perspectiva}PJ`];
-  }
+  if (segmento === "Todos") return [`VL_${perspectiva}PF`, `VL_${perspectiva}PJ`];
   return [`VL_${perspectiva}${segmento}`];
 }
 
 function quantidadeFields(perspectiva, segmento) {
-  if (segmento === "Todos") {
-    return [`QT_${perspectiva}PF`, `QT_${perspectiva}PJ`];
-  }
+  if (segmento === "Todos") return [`QT_${perspectiva}PF`, `QT_${perspectiva}PJ`];
   return [`QT_${perspectiva}${segmento}`];
 }
 
@@ -52,7 +49,13 @@ export function TransacoesMunicipioPage({ municipio }) {
   const [segmento, setSegmento] = useState("Todos");
   const range = { start: start ?? months[0], end: end ?? months[months.length - 1] };
 
-  const [selecaoMunicipio, setSelecaoMunicipio] = useState({ municipio: null, dadosEstado: [] });
+  const [selecaoMunicipio, setSelecaoMunicipio] = useState({
+    regiao: null,
+    estadoIbge: null,
+    municipio: null,
+    dadosEstado: [],
+  });
+
   const serieMunicipio = useMemo(() => {
     if (!selecaoMunicipio.municipio) return [];
     return selecaoMunicipio.dadosEstado.filter((r) => r.Municipio_Ibge === selecaoMunicipio.municipio.ibge);
@@ -140,8 +143,23 @@ export function TransacoesMunicipioPage({ municipio }) {
       </section>
 
       <MunicipioSelector
-        onChange={(s) => setSelecaoMunicipio({ municipio: s.municipio, dadosEstado: s.dadosEstado })}
+        onChange={(s) =>
+          setSelecaoMunicipio({
+            regiao: s.regiao || null,
+            estadoIbge: s.estadoIbge || null,
+            municipio: s.municipio,
+            dadosEstado: s.dadosEstado,
+          })
+        }
       />
+
+      <section className="charts-grid">
+        <RegiaoSummaryChart
+          porEstadoMensal={municipio.porEstadoMensal}
+          regiao={selecaoMunicipio.regiao}
+          estadoIbge={selecaoMunicipio.estadoIbge}
+        />
+      </section>
 
       {selecaoMunicipio.municipio && (
         <section className="charts-grid">

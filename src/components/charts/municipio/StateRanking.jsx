@@ -6,7 +6,7 @@ import { ChartCard } from "../../shared/ChartCard";
 import { ChartTooltip } from "../../shared/ChartTooltip";
 import { formatCurrencyCompact, formatCurrencyFull } from "../../../lib/format";
 
-const TOP_N = 12;
+const TOP_N = 10;
 
 function toTitleCase(s) {
   return s.replace(/\S+/g, (w) => w[0] + w.slice(1).toLowerCase());
@@ -19,16 +19,8 @@ function valorFields(perspectiva, segmento) {
   return [`VL_${perspectiva}${segmento}`];
 }
 
-const PERSPECTIVA_LABEL = {
-  Pagador: "pago",
-  Recebedor: "recebido",
-};
-
-const SEGMENTO_LABEL = {
-  Todos: "PF + PJ",
-  PF: "pessoa física",
-  PJ: "pessoa jurídica",
-};
+const PERSPECTIVA_LABEL = { Pagador: "pago", Recebedor: "recebido" };
+const SEGMENTO_LABEL = { Todos: "PF + PJ", PF: "pessoa física", PJ: "pessoa jurídica" };
 
 export function StateRanking({
   porEstadoMensal,
@@ -52,8 +44,7 @@ export function StateRanking({
     return [...byState.entries()]
       .map(([estado, valor]) => ({ estado: toTitleCase(estado), valor }))
       .sort((a, b) => b.valor - a.valor)
-      .slice(0, TOP_N)
-      .reverse();
+      .slice(0, TOP_N);
   }, [porEstadoMensal, start, end, regiao, fields.join(",")]);
 
   return (
