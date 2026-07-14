@@ -17,19 +17,7 @@ import {
   formatNumberCompact,
   formatNumberFull,
 } from "../../../lib/format";
-
-const LINE_COLORS = [
-  "var(--series-1)",
-  "var(--series-2)",
-  "var(--series-3)",
-  "var(--series-4)",
-  "var(--series-5)",
-  "var(--series-6)",
-  "var(--series-7)",
-  "var(--series-8)",
-  "var(--seq-500)",
-  "var(--accent-secondary)",
-];
+import { participantColor } from "../../../lib/participantColors";
 
 // "2020-11" (YYYY-MM) -> 202011 (AAAAMM), para casar com o Filters
 function mesToAnoMes(mes) {
@@ -114,15 +102,16 @@ export function ChavesTopParticipantesSerie({
 }) {
   const { meses, PF, PJ } = topParticipantesSerie;
 
-  // Um mapa nome -> cor estável para cada painel (cores independentes,
-  // já que os tops de PF e PJ podem ter participantes diferentes).
+  // Cor de marca por participante — mesma cor para a mesma empresa nos dois
+  // painéis. O index (posição no ranking) só é usado como fallback quando o
+  // nome não está mapeado em participantColors.
   const colorForPF = useMemo(() => {
-    const map = new Map(PF.participantes.map((n, i) => [n, LINE_COLORS[i % LINE_COLORS.length]]));
+    const map = new Map(PF.participantes.map((n, i) => [n, participantColor(n, i)]));
     return (nome) => map.get(nome) ?? "var(--text-muted)";
   }, [PF.participantes]);
 
   const colorForPJ = useMemo(() => {
-    const map = new Map(PJ.participantes.map((n, i) => [n, LINE_COLORS[i % LINE_COLORS.length]]));
+    const map = new Map(PJ.participantes.map((n, i) => [n, participantColor(n, i)]));
     return (nome) => map.get(nome) ?? "var(--text-muted)";
   }, [PJ.participantes]);
 

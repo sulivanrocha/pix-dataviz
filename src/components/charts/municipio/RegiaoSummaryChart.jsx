@@ -4,7 +4,7 @@ import {
 } from "recharts";
 import { ChartCard } from "../../shared/ChartCard";
 import { ChartTooltip } from "../../shared/ChartTooltip";
-import { formatAnoMes, formatCurrencyCompact, formatCurrencyFull, formatNumberCompact, formatNumberFull } from "../../../lib/format";
+import { formatAnoMes, formatCurrencyCompact, formatCurrencyFull } from "../../../lib/format";
 
 const PERSPECTIVAS = [
   { value: "Pagador", label: "Pagador" },
@@ -21,9 +21,16 @@ function quantidadeField(perspectiva, seg) {
 
 // Sempre visível: soma valor/quantidade PF+PJ por mês, a partir de
 // porEstadoMensal (cubo já carregado na página). Sem filtro de estado
-// selecionado, soma o Brasil inteiro; com um estadoIbge, restringe a ele.
-export function RegiaoSummaryChart({ porEstadoMensal, regiao, estadoIbge, estadoNome }) {
+// selecionado, soma o Brasil inteiro; com um estadoIbge, restringe a ele;
+// com apenas uma regiao (sem estado ainda), restringe à região.
+export function RegiaoSummaryChart({ porEstadoMensal, regiao, estadoIbge }) {
   const [perspectiva, setPerspectiva] = useState("Pagador");
+
+  const estadoNome = useMemo(() => {
+    if (!estadoIbge) return null;
+    const match = porEstadoMensal.find((r) => r.Estado_Ibge === estadoIbge);
+    return match ? match.Estado : null;
+  }, [porEstadoMensal, estadoIbge]);
 
   const rows = useMemo(() => {
     const filtered = porEstadoMensal.filter((r) => {
@@ -53,7 +60,7 @@ export function RegiaoSummaryChart({ porEstadoMensal, regiao, estadoIbge, estado
       }));
   }, [porEstadoMensal, regiao, estadoIbge, perspectiva]);
 
-  const scopeLabel = estadoNome ?? (regiao ? regiao : "Brasil (todos os estados)");
+  const scopeLabel = estadoNome ?? (regiao && regiao !== "Todas" ? regiao : "Brasil (todos os estados)");
   const perspectivaLabel = perspectiva === "Pagador" ? "pago" : "recebido";
 
   const tabs = (
@@ -81,7 +88,12 @@ export function RegiaoSummaryChart({ porEstadoMensal, regiao, estadoIbge, estado
       <ResponsiveContainer width="100%" height={280}>
         <BarChart data={rows} margin={{ top: 8, right: 16, left: 4, bottom: 0 }}>
           <CartesianGrid stroke="var(--gridline)" vertical={false} />
-          <XAxis dataKey="mes" tick={{ fontSize: 11, fill: "var(--text-muted)" }} axisLine={{ stroke: "var(--baseline)" }} tickLine={false} />
+          <XAxis
+            dataKey="mes"
+            tick={{ fontSize: 11, fill: "var(--text-muted)" }}
+            axisLine={{ stroke: "var(--baseline)" }}
+            tickLine={false}
+          />
           <YAxis
             tick={{ fontSize: 11, fill: "var(--text-muted)" }}
             axisLine={false}
