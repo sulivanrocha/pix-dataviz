@@ -228,12 +228,55 @@ function porParticipanteDeChaves(rows) {
     .sort((a, b) => b.total - a.total);
 }
 
+// Série mensal por participante, separada em PF e PJ. Diferente de
+// porMesChaves (que soma todos os participantes) e de porParticipanteDeChaves
+// (que fica só no último mês), aqui preservamos Data x Nome x NaturezaUsuario
+// para permitir uma série histórica por participante. Cada painel (PF/PJ)
+// traz seu próprio top 10, ranqueado pelo estoque no último mês.
+function topParticipantesSerieDeChaves(rows, topN = 10) {
+  const meses = [...new Set(rows.map((r) => r.Data.slice(0, 7)))].sort();
+  const mesIndex = new Map(meses.map((mes, i) => [mes, i]));
+
+  // natureza -> nome -> array alinhado a `meses`
+  const acc = { PF: new Map(), PJ: new Map() };
+
+  for (const r of rows) {
+    const natureza = r.NaturezaUsuario;
+    if (natureza !== "PF" && natureza !== "PJ") continue;
+
+    const bucket = acc[natureza];
+    let serie = bucket.get(r.Nome);
+    if (!serie) {
+      serie = new Array(meses.length).fill(0);
+      bucket.set(r.Nome, serie);
+    }
+    serie[mesIndex.get(r.Data.slice(0, 7))] += r.qtdChaves;
+  }
+
+  function buildPanel(bucket) {
+    const participantes = [...bucket.entries()]
+      .map(([nome, serie]) => ({ nome, ultimo: serie[serie.length - 1] ?? 0 }))
+      .sort((a, b) => b.ultimo - a.ultimo)
+      .slice(0, topN)
+      .map((p) => p.nome);
+
+    const series = {};
+    for (const nome of participantes) {
+      series[nome] = bucket.get(nome);
+    }
+    return { participantes, series };
+  }
+
+  return { meses, PF: buildPanel(acc.PF), PJ: buildPanel(acc.PJ) };
+}
+
 function buildChavesPix(rows) {
   const historico = porMesChaves(rows);
   const ultimaData = historico[historico.length - 1].data;
   const porParticipante = porParticipanteDeChaves(rows.filter((r) => r.Data === ultimaData));
+  const topParticipantesSerie = topParticipantesSerieDeChaves(rows);
 
-  return { data: ultimaData, historico, porParticipante };
+  return { data: ultimaData, historico, porParticipante, topParticipantesSerie };
 }
 
 async function main() {

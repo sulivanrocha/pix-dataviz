@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { StatTile } from "../components/shared/StatTile";
 import { ChavesHistorico } from "../components/charts/chaves/ChavesHistorico";
 import { ChavesPorParticipante } from "../components/charts/chaves/ChavesPorParticipante";
+import { ChavesTopParticipantesSerie } from "../components/charts/chaves/ChavesTopParticipantesSerie";
 import {
   formatAnoMes,
   formatNumberCompact,
@@ -81,6 +82,26 @@ export function ChavesPixPage({ chaves }) {
     return formatAnoMes(numericMonth);
   }, [latestRecord]);
 
+  // Série histórica por participante (Top 10 por tipo). Só existe se o
+  // snapshot foi gerado por uma versão do fetch-data.mjs que inclui a chave
+  // topParticipantesSerie — por isso guardamos o render abaixo.
+  const topSerie = chaves.topParticipantesSerie;
+
+  const serieMonths = useMemo(
+    () =>
+      topSerie
+        ? topSerie.meses.map((mes) => Number(mes.replace("-", "")))
+        : [],
+    [topSerie]
+  );
+
+  const [serieStart, setSerieStart] = useState(null);
+  const [serieEnd, setSerieEnd] = useState(null);
+  const serieRange = {
+    start: serieStart ?? serieMonths[0],
+    end: serieEnd ?? serieMonths[serieMonths.length - 1],
+  };
+
   return (
     <>
       <section className="kpi-row">
@@ -122,6 +143,19 @@ export function ChavesPixPage({ chaves }) {
           onTopNChange={setTopN}
         />
       </section>
+
+      {topSerie && serieMonths.length > 0 && (
+        <section className="charts-grid">
+          <ChavesTopParticipantesSerie
+            topParticipantesSerie={topSerie}
+            months={serieMonths}
+            start={serieRange.start}
+            end={serieRange.end}
+            onStartChange={setSerieStart}
+            onEndChange={setSerieEnd}
+          />
+        </section>
+      )}
     </>
   );
 }
