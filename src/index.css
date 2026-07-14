@@ -595,7 +595,8 @@ input:focus {
   line-height: 1.6;
   color: var(--text-secondary);
   margin: 0 0 10px;
-  max-width: 78ch;
+  max-width: none;
+  width: 100%;
 }
 
 .overview-intro p:last-child {
