@@ -15,6 +15,31 @@ const REGIOES = [
   { value: "CENTRO-OESTE", label: "Centro-Oeste" },
 ];
 
+const PERSPECTIVAS = [
+  { value: "Pagador", label: "Pagador" },
+  { value: "Recebedor", label: "Recebedor" },
+];
+
+const SEGMENTOS = [
+  { value: "Todos", label: "Todos (PF + PJ)" },
+  { value: "PF", label: "Pessoa física (PF)" },
+  { value: "PJ", label: "Pessoa jurídica (PJ)" },
+];
+
+function valorFields(perspectiva, segmento) {
+  if (segmento === "Todos") {
+    return [`VL_${perspectiva}PF`, `VL_${perspectiva}PJ`];
+  }
+  return [`VL_${perspectiva}${segmento}`];
+}
+
+function quantidadeFields(perspectiva, segmento) {
+  if (segmento === "Todos") {
+    return [`QT_${perspectiva}PF`, `QT_${perspectiva}PJ`];
+  }
+  return [`QT_${perspectiva}${segmento}`];
+}
+
 export function TransacoesMunicipioPage({ municipio }) {
   const months = useMemo(
     () => [...new Set(municipio.porEstadoMensal.map((r) => r.AnoMes))].sort(),
@@ -23,6 +48,8 @@ export function TransacoesMunicipioPage({ municipio }) {
   const [start, setStart] = useState(null);
   const [end, setEnd] = useState(null);
   const [regiao, setRegiao] = useState("Todas");
+  const [perspectiva, setPerspectiva] = useState("Pagador");
+  const [segmento, setSegmento] = useState("Todos");
   const range = { start: start ?? months[0], end: end ?? months[months.length - 1] };
 
   const [selecaoMunicipio, setSelecaoMunicipio] = useState({ municipio: null, dadosEstado: [] });
@@ -32,24 +59,30 @@ export function TransacoesMunicipioPage({ municipio }) {
   }, [selecaoMunicipio]);
 
   const totals = useMemo(() => {
+    const vFields = valorFields(perspectiva, segmento);
+    const qFields = quantidadeFields(perspectiva, segmento);
+
     const filtered = municipio.porEstadoMensal.filter(
       (r) => r.AnoMes >= range.start && r.AnoMes <= range.end && (regiao === "Todas" || r.Regiao === regiao)
     );
+
     return filtered.reduce(
       (acc, r) => {
-        acc.valor += r.VL_PagadorPF + r.VL_PagadorPJ;
-        acc.quantidade += r.QT_PagadorPF + r.QT_PagadorPJ;
+        acc.valor += vFields.reduce((sum, field) => sum + (Number(r[field]) || 0), 0);
+        acc.quantidade += qFields.reduce((sum, field) => sum + (Number(r[field]) || 0), 0);
         return acc;
       },
       { valor: 0, quantidade: 0 }
     );
-  }, [municipio, range.start, range.end, regiao]);
+  }, [municipio, range.start, range.end, regiao, perspectiva, segmento]);
+
+  const perspectivaLabel = perspectiva === "Pagador" ? "pago" : "recebido";
 
   return (
     <>
       <section className="kpi-row">
-        <StatTile label="Valor pago no período" value={formatCurrencyCompact(totals.valor)} />
-        <StatTile label="Transações pagas no período" value={formatNumberCompact(totals.quantidade)} />
+        <StatTile label={`Valor ${perspectivaLabel} no período`} value={formatCurrencyCompact(totals.valor)} />
+        <StatTile label={`Transações (${perspectivaLabel}s) no período`} value={formatNumberCompact(totals.quantidade)} />
         <StatTile label="Ticket médio" value={formatCurrencyFull(totals.valor / totals.quantidade)} />
       </section>
 
@@ -71,10 +104,39 @@ export function TransacoesMunicipioPage({ municipio }) {
             ))}
           </select>
         </label>
+
+        <label>
+          Perspectiva
+          <select value={perspectiva} onChange={(e) => setPerspectiva(e.target.value)}>
+            {PERSPECTIVAS.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          Segmento
+          <select value={segmento} onChange={(e) => setSegmento(e.target.value)}>
+            {SEGMENTOS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </Filters>
 
       <section className="charts-grid">
-        <StateRanking porEstadoMensal={municipio.porEstadoMensal} start={range.start} end={range.end} regiao={regiao} />
+        <StateRanking
+          porEstadoMensal={municipio.porEstadoMensal}
+          start={range.start}
+          end={range.end}
+          regiao={regiao}
+          perspectiva={perspectiva}
+          segmento={segmento}
+        />
       </section>
 
       <MunicipioSelector
