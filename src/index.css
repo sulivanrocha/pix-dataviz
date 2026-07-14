@@ -634,3 +634,32 @@ input:focus {
   color: var(--text-secondary);
   margin: 0;
 }
+/* --- Municipality analysis section: filters and charts share one block --- */
+.municipio-analysis-block {
+  margin-top: 16px;
+  padding: 14px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.municipio-analysis-filters {
+  position: relative;
+  z-index: 2;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.municipio-analysis-block .filters-row {
+  margin-bottom: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.municipio-analysis-block .chart-card {
+  box-shadow: none;
+}

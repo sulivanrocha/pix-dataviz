@@ -38,9 +38,20 @@ function quantidadeFields(perspectiva, segmento) {
 }
 
 export function TransacoesMunicipioPage({ municipio }) {
+  const ultimoMesCompleto = useMemo(() => {
+    const hoje = new Date();
+    const ultimoDiaMesAnterior = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
+    return ultimoDiaMesAnterior.getFullYear() * 100 + (ultimoDiaMesAnterior.getMonth() + 1);
+  }, []);
+
   const months = useMemo(
-    () => [...new Set(municipio.porEstadoMensal.map((r) => r.AnoMes))].sort((a, b) => a - b),
-    [municipio]
+    () =>
+      [...new Set(
+        municipio.porEstadoMensal
+          .map((r) => r.AnoMes)
+          .filter((anoMes) => anoMes <= ultimoMesCompleto)
+      )].sort((a, b) => a - b),
+    [municipio, ultimoMesCompleto]
   );
   const [start, setStart] = useState(null);
   const [end, setEnd] = useState(null);
@@ -58,8 +69,44 @@ export function TransacoesMunicipioPage({ municipio }) {
 
   const serieMunicipio = useMemo(() => {
     if (!selecaoMunicipio.municipio) return [];
-    return selecaoMunicipio.dadosEstado.filter((r) => r.Municipio_Ibge === selecaoMunicipio.municipio.ibge);
-  }, [selecaoMunicipio]);
+    return selecaoMunicipio.dadosEstado.filter(
+      (r) =>
+        r.Municipio_Ibge === selecaoMunicipio.municipio.ibge &&
+        r.AnoMes <= ultimoMesCompleto
+    );
+  }, [selecaoMunicipio, ultimoMesCompleto]);
+
+  const seriePFPJ = useMemo(() => {
+    if (serieMunicipio.length > 0) return serieMunicipio;
+
+    const filtered = municipio.porEstadoMensal.filter((r) => {
+      if (r.AnoMes > ultimoMesCompleto) return false;
+      if (selecaoMunicipio.estadoIbge) return r.Estado_Ibge === selecaoMunicipio.estadoIbge;
+      if (selecaoMunicipio.regiao && selecaoMunicipio.regiao !== "Todas") {
+        return r.Regiao === selecaoMunicipio.regiao;
+      }
+      return true;
+    });
+
+    const byMonth = new Map();
+    for (const row of filtered) {
+      const current = byMonth.get(row.AnoMes) ?? { AnoMes: row.AnoMes };
+      for (const [key, value] of Object.entries(row)) {
+        if (key.startsWith("VL_") || key.startsWith("QT_")) {
+          current[key] = (Number(current[key]) || 0) + (Number(value) || 0);
+        }
+      }
+      byMonth.set(row.AnoMes, current);
+    }
+
+    return [...byMonth.values()].sort((a, b) => a.AnoMes - b.AnoMes);
+  }, [
+    municipio.porEstadoMensal,
+    selecaoMunicipio.estadoIbge,
+    selecaoMunicipio.regiao,
+    serieMunicipio,
+    ultimoMesCompleto,
+  ]);
 
   const totals = useMemo(() => {
     const vFields = valorFields(perspectiva, segmento);
@@ -145,33 +192,37 @@ export function TransacoesMunicipioPage({ municipio }) {
         />
       </section>
 
-      <MunicipioSelector
-        onChange={(s) =>
-          setSelecaoMunicipio({
-            regiao: s.regiao || null,
-            estadoIbge: s.estadoIbge || null,
-            municipio: s.municipio,
-            dadosEstado: s.dadosEstado,
-          })
-        }
-      />
+      <section className="municipio-analysis-block">
+        <div className="municipio-analysis-filters">
+          <MunicipioSelector
+            onChange={(s) =>
+              setSelecaoMunicipio({
+                regiao: s.regiao || null,
+                estadoIbge: s.estadoIbge || null,
+                municipio: s.municipio,
+                dadosEstado: s.dadosEstado,
+              })
+            }
+          />
+        </div>
 
-      <section className="charts-grid">
-        <RegiaoSummaryChart
-          porEstadoMensal={municipio.porEstadoMensal}
-          regiao={selecaoMunicipio.regiao}
-          estadoIbge={selecaoMunicipio.estadoIbge}
-          municipio={selecaoMunicipio.municipio}
-          serieMunicipio={serieMunicipio}
-        />
-      </section>
-
-      {selecaoMunicipio.municipio && (
         <section className="charts-grid">
-          <MunicipioPFPJChart serieMensal={serieMunicipio} tipo="PF" />
-          <MunicipioPFPJChart serieMensal={serieMunicipio} tipo="PJ" />
+          <RegiaoSummaryChart
+            porEstadoMensal={municipio.porEstadoMensal}
+            regiao={selecaoMunicipio.regiao}
+            estadoIbge={selecaoMunicipio.estadoIbge}
+            municipio={selecaoMunicipio.municipio}
+            serieMunicipio={serieMunicipio}
+            perspectiva={perspectiva}
+            ultimoMesCompleto={ultimoMesCompleto}
+          />
         </section>
-      )}
+
+        <section className="charts-grid">
+          <MunicipioPFPJChart serieMensal={seriePFPJ} tipo="PF" />
+          <MunicipioPFPJChart serieMensal={seriePFPJ} tipo="PJ" />
+        </section>
+      </section>
     </>
   );
 }

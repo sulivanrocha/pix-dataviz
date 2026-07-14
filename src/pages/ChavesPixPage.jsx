@@ -106,21 +106,21 @@ export function ChavesPixPage({ chaves }) {
     <>
       <section className="kpi-row">
         <StatTile
-          label={`Total de chaves Pix · ${referenceMonth}`}
+          label={`Total de chaves Pix (${referenceMonth})`}
           value={formatNumberCompact(
             Number(latestRecord?.total) || 0
           )}
         />
 
         <StatTile
-          label={`Chaves de pessoa física · ${referenceMonth}`}
+          label={`Chaves de pessoa física (${referenceMonth})`}
           value={formatNumberCompact(
             Number(latestRecord?.PF) || 0
           )}
         />
 
         <StatTile
-          label={`Chaves de pessoa jurídica · ${referenceMonth}`}
+          label={`Chaves de pessoa jurídica (${referenceMonth})`}
           value={formatNumberCompact(
             Number(latestRecord?.PJ) || 0
           )}
