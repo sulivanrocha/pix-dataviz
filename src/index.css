@@ -558,3 +558,78 @@ input:focus {
 .filters-cascade-selects select:last-child {
   width: 70px;
 }
+
+/* --- Overview / landing page --- */
+.overview-intro {
+  background: var(--surface-1);
+  color: var(--text-primary);
+  padding: 20px 22px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.overview-intro__eyebrow {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.overview-intro h2 {
+  font-family: var(--sans);
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: -0.2px;
+  margin: 0 0 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.overview-intro p {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin: 0 0 10px;
+  max-width: 78ch;
+}
+
+.overview-intro p:last-child {
+  margin-bottom: 0;
+}
+
+.overview-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.overview-card__badge {
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.overview-card__question {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -0.1px;
+  margin: 0;
+}
+
+.overview-card__description {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  margin: 0;
+}
