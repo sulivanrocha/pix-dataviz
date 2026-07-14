@@ -4,12 +4,25 @@ import {
 } from "recharts";
 import { ChartCard } from "../../shared/ChartCard";
 import { ChartTooltip } from "../../shared/ChartTooltip";
-import { formatAnoMes, formatCurrencyCompact, formatCurrencyFull } from "../../../lib/format";
+import {
+  formatAnoMes,
+  formatCurrencyCompact,
+  formatCurrencyFull,
+  formatNumberCompact,
+} from "../../../lib/format";
 
 const SEGMENTO_LABEL = {
   Todos: "PF + PJ",
   PF: "pessoa física",
   PJ: "pessoa jurídica",
+};
+
+// Título por visão × perspectiva, com concordância correta
+// ("Valor pago" / "Transações pagas").
+const TITULO_METRICA = {
+  valor: { Pagador: "Valor pago", Recebedor: "Valor recebido" },
+  transacoes: { Pagador: "Transações pagas", Recebedor: "Transações recebidas" },
+  pessoas: { Pagador: "Pessoas pagadoras", Recebedor: "Pessoas recebedoras" },
 };
 
 function valorField(perspectiva, seg) {
@@ -31,17 +44,47 @@ function sumBySegmento(row, perspectiva, segmento, fieldFn) {
   return Number(row[fieldFn(perspectiva, segmento)]) || 0;
 }
 
+// Configuração de série/formatadores por visão. A visão "pessoas" retorna
+// null: os campos QT_PES contam pessoas distintas por mês e não podem ser
+// somados no período, então o gráfico exibe uma mensagem em vez de dados.
+function getMetricConfig(visao) {
+  if (visao === "valor") {
+    return {
+      dataKey: "valor",
+      seriesName: "Valor",
+      axisFormatter: formatCurrencyCompact,
+      tooltipFormatter: formatCurrencyFull,
+    };
+  }
+
+  if (visao === "transacoes") {
+    return {
+      dataKey: "quantidade",
+      seriesName: "Transações",
+      axisFormatter: formatNumberCompact,
+      tooltipFormatter: formatNumberCompact,
+    };
+  }
+
+  return null;
+}
+
 export function RegiaoSummaryChart({
   porEstadoMensal,
+  start,
+  end,
   regiao,
   estadoIbge,
   municipio,
   serieMunicipio,
   perspectiva,
   segmento = "Todos",
+  visao = "valor",
   ultimoMesCompleto,
 }) {
   const nivelMunicipio = Boolean(municipio && serieMunicipio?.length);
+
+  const metricConfig = getMetricConfig(visao);
 
   const estadoNome = useMemo(() => {
     if (!estadoIbge) return null;
@@ -50,9 +93,16 @@ export function RegiaoSummaryChart({
   }, [porEstadoMensal, estadoIbge]);
 
   const rows = useMemo(() => {
+    const dentroDoPeriodo = (anoMes) => {
+      if (anoMes > ultimoMesCompleto) return false;
+      if (start != null && anoMes < start) return false;
+      if (end != null && anoMes > end) return false;
+      return true;
+    };
+
     if (nivelMunicipio) {
       return [...serieMunicipio]
-        .filter((r) => r.AnoMes <= ultimoMesCompleto)
+        .filter((r) => dentroDoPeriodo(r.AnoMes))
         .sort((a, b) => a.AnoMes - b.AnoMes)
         .map((r) => ({
           mes: formatAnoMes(r.AnoMes),
@@ -62,7 +112,7 @@ export function RegiaoSummaryChart({
     }
 
     const filtered = porEstadoMensal.filter((r) => {
-      if (r.AnoMes > ultimoMesCompleto) return false;
+      if (!dentroDoPeriodo(r.AnoMes)) return false;
       if (estadoIbge) return r.Estado_Ibge === estadoIbge;
       if (regiao && regiao !== "Todas") return r.Regiao === regiao;
       return true;
@@ -94,6 +144,8 @@ export function RegiaoSummaryChart({
     segmento,
     nivelMunicipio,
     serieMunicipio,
+    start,
+    end,
     ultimoMesCompleto,
   ]);
 
@@ -105,37 +157,49 @@ export function RegiaoSummaryChart({
     ? scopeParts.join(" › ")
     : "Brasil (todos os estados)";
 
-  const perspectivaLabel = perspectiva === "Pagador" ? "pago" : "recebido";
+  const tituloMetrica =
+    TITULO_METRICA[visao]?.[perspectiva] ?? "Série histórica";
 
   return (
     <ChartCard
-      title={`Total ${perspectivaLabel}: ${scopeLabel}`}
-      subtitle={`Soma mensal de ${SEGMENTO_LABEL[segmento]}, atualizada conforme os filtros desta seção.`}
+      title={`${tituloMetrica}, mês a mês: ${scopeLabel}`}
+      subtitle={`Soma mensal de ${SEGMENTO_LABEL[segmento]}, atualizada conforme todos os filtros da página.`}
       fullWidth
     >
-      <ResponsiveContainer width="100%" height={280}>
-        <BarChart data={rows} margin={{ top: 8, right: 16, left: 4, bottom: 0 }}>
-          <CartesianGrid stroke="var(--gridline)" vertical={false} />
-          <XAxis
-            dataKey="mes"
-            tick={{ fontSize: 11, fill: "var(--text-muted)" }}
-            axisLine={{ stroke: "var(--baseline)" }}
-            tickLine={false}
-          />
-          <YAxis
-            tick={{ fontSize: 11, fill: "var(--text-muted)" }}
-            axisLine={false}
-            tickLine={false}
-            width={56}
-            tickFormatter={formatCurrencyCompact}
-          />
-          <Tooltip
-            cursor={{ fill: "var(--gridline)", opacity: 0.35 }}
-            content={<ChartTooltip formatValue={formatCurrencyFull} />}
-          />
-          <Bar dataKey="valor" name="Valor" fill="var(--series-1)" radius={[3, 3, 0, 0]} />
-        </BarChart>
-      </ResponsiveContainer>
+      {metricConfig ? (
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={rows} margin={{ top: 8, right: 16, left: 4, bottom: 0 }}>
+            <CartesianGrid stroke="var(--gridline)" vertical={false} />
+            <XAxis
+              dataKey="mes"
+              tick={{ fontSize: 11, fill: "var(--text-muted)" }}
+              axisLine={{ stroke: "var(--baseline)" }}
+              tickLine={false}
+            />
+            <YAxis
+              tick={{ fontSize: 11, fill: "var(--text-muted)" }}
+              axisLine={false}
+              tickLine={false}
+              width={56}
+              tickFormatter={metricConfig.axisFormatter}
+            />
+            <Tooltip
+              cursor={{ fill: "var(--gridline)", opacity: 0.35 }}
+              content={<ChartTooltip formatValue={metricConfig.tooltipFormatter} />}
+            />
+            <Bar
+              dataKey={metricConfig.dataKey}
+              name={metricConfig.seriesName}
+              fill="var(--series-1)"
+              radius={[3, 3, 0, 0]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      ) : (
+        <div className="state-message">
+          Configure os campos da visão Pessoas para exibir este gráfico.
+        </div>
+      )}
     </ChartCard>
   );
 }

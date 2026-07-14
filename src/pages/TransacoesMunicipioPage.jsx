@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Filters } from "../components/shared/Filters";
 import { StatTile } from "../components/shared/StatTile";
 import { StateRanking } from "../components/charts/municipio/StateRanking";
+import { MunicipioRanking } from "../components/charts/municipio/MunicipioRanking";
 import { RegiaoSummaryChart } from "../components/charts/municipio/RegiaoSummaryChart";
 import { MunicipioSelector } from "../components/MunicipioSelector";
 import {
@@ -537,23 +538,10 @@ export function TransacoesMunicipioPage({ municipio }) {
         />
       </section>
 
-      <section className="charts-grid">
-        <StateRanking
-          porEstadoMensal={
-            municipio?.porEstadoMensal ?? []
-          }
-          start={range.start}
-          end={range.end}
-          regiao={filtros.regiao}
-          estadoIbge={filtros.estadoIbge}
-          perspectiva={filtros.perspectiva}
-          segmento={filtros.segmento}
-          visao={filtros.visao}
-          topN={10}
-          showCsvDownload
-        />
-      </section>
-
+      {/*
+        1º gráfico: série histórica mês a mês.
+        Respeita TODOS os filtros da página, inclusive os geográficos.
+      */}
       <section className="charts-grid">
         <RegiaoSummaryChart
           porEstadoMensal={
@@ -571,7 +559,35 @@ export function TransacoesMunicipioPage({ municipio }) {
           ultimoMesCompleto={
             ultimoMesCompleto
           }
-          showCsvDownload
+        />
+      </section>
+
+      {/*
+        2º bloco: rankings nacionais lado a lado
+        (estados à esquerda, municípios à direita).
+
+        Propositalmente NÃO recebem regiao/estadoIbge/municipio:
+        são sempre Brasil inteiro e respondem apenas a período,
+        perspectiva, visão e segmento.
+      */}
+      <section className="charts-grid">
+        <StateRanking
+          porEstadoMensal={
+            municipio?.porEstadoMensal ?? []
+          }
+          start={range.start}
+          end={range.end}
+          perspectiva={filtros.perspectiva}
+          segmento={filtros.segmento}
+          visao={filtros.visao}
+        />
+
+        <MunicipioRanking
+          start={range.start}
+          end={range.end}
+          perspectiva={filtros.perspectiva}
+          segmento={filtros.segmento}
+          visao={filtros.visao}
         />
       </section>
 

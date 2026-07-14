@@ -215,6 +215,12 @@ export function StateRanking({
    * }}
    */
   pessoasFields = null,
+
+  /**
+   * Quando o card divide a linha com outro gráfico
+   * (ex.: ranking de municípios), deixe como false.
+   */
+  fullWidth = false,
 }) {
   const metricConfig = useMemo(
     () => getMetricConfig(visao),
@@ -319,11 +325,19 @@ export function StateRanking({
     ? `${metricText} ${perspectiveText} no estado selecionado`
     : `Top ${TOP_N} estados por ${metricText} ${perspectiveText}`;
 
+  const escopoNacional =
+    (!regiao || regiao === "Todas") &&
+    !estadoIbge;
+
   const subtitle =
     visao === "pessoas" &&
     !metricFields.length
       ? "Os campos de pessoas ainda precisam ser configurados de acordo com a estrutura da base."
-      : `${SEGMENTO_LABEL[segmento]}, perspectiva ${perspectiva.toLowerCase()}, no período filtrado.`;
+      : `${SEGMENTO_LABEL[segmento]}, perspectiva ${perspectiva.toLowerCase()}, no período filtrado.${
+          escopoNacional
+            ? " Brasil inteiro — não é afetado pelos filtros de região, estado e município."
+            : ""
+        }`;
 
   const actions = (
     <button
@@ -348,7 +362,7 @@ export function StateRanking({
     <ChartCard
       title={title}
       subtitle={subtitle}
-      fullWidth
+      fullWidth={fullWidth}
       tabs={actions}
     >
       {rows.length > 0 ? (

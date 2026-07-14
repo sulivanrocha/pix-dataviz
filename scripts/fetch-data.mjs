@@ -205,6 +205,106 @@ function buildMunicipiosDetalhado(rows) {
   return { index, porEstado: porEstadoMap };
 }
 
+// --- Top municípios (Brasil inteiro) ---
+// O ranking municipal nacional precisa da série mensal completa (Pagador E
+// Recebedor) de todos os candidatos plausíveis a top 10 sob qualquer
+// combinação de filtros (período, perspectiva, visão, segmento). Enviar os
+// ~5.5k municípios seria pesado demais (~70MB); em vez disso, ranqueamos os
+// municípios pelo total histórico de cada métrica (VL/QT × Pagador/Recebedor
+// × PF/PJ/PF+PJ) e mantemos a união dos top N de cada um dos 12 rankings.
+// Na prática, o top 10 de qualquer recorte está contido nesse conjunto
+// (~100–200 municípios, dominado por capitais e grandes cidades).
+const TOP_MUNICIPIOS_POR_METRICA = 60;
+
+function buildMunicipiosTop(rows) {
+  const porMunicipio = new Map();
+
+  for (const r of rows) {
+    // Mesmo critério de buildMunicipiosDetalhado: linhas sem município
+    // identificado ficam fora do cubo municipal.
+    if (r.Municipio_Ibge == null || r.Estado_Ibge == null) continue;
+
+    const cur = porMunicipio.get(r.Municipio_Ibge) ?? {
+      meta: {
+        ibge: r.Municipio_Ibge,
+        nome: r.Municipio,
+        estadoIbge: r.Estado_Ibge,
+        estado: r.Estado,
+        uf: ufPorEstadoIbge(r.Estado_Ibge),
+        regiao: r.Regiao,
+      },
+      totais: {
+        VL_PagadorPF: 0,
+        QT_PagadorPF: 0,
+        VL_PagadorPJ: 0,
+        QT_PagadorPJ: 0,
+        VL_RecebedorPF: 0,
+        QT_RecebedorPF: 0,
+        VL_RecebedorPJ: 0,
+        QT_RecebedorPJ: 0,
+      },
+      serie: [],
+    };
+
+    cur.totais.VL_PagadorPF += r.VL_PagadorPF ?? 0;
+    cur.totais.QT_PagadorPF += r.QT_PagadorPF ?? 0;
+    cur.totais.VL_PagadorPJ += r.VL_PagadorPJ ?? 0;
+    cur.totais.QT_PagadorPJ += r.QT_PagadorPJ ?? 0;
+    cur.totais.VL_RecebedorPF += r.VL_RecebedorPF ?? 0;
+    cur.totais.QT_RecebedorPF += r.QT_RecebedorPF ?? 0;
+    cur.totais.VL_RecebedorPJ += r.VL_RecebedorPJ ?? 0;
+    cur.totais.QT_RecebedorPJ += r.QT_RecebedorPJ ?? 0;
+
+    cur.serie.push({
+      AnoMes: r.AnoMes,
+      VL_PagadorPF: round2(r.VL_PagadorPF ?? 0),
+      QT_PagadorPF: r.QT_PagadorPF ?? 0,
+      VL_PagadorPJ: round2(r.VL_PagadorPJ ?? 0),
+      QT_PagadorPJ: r.QT_PagadorPJ ?? 0,
+      VL_RecebedorPF: round2(r.VL_RecebedorPF ?? 0),
+      QT_RecebedorPF: r.QT_RecebedorPF ?? 0,
+      VL_RecebedorPJ: round2(r.VL_RecebedorPJ ?? 0),
+      QT_RecebedorPJ: r.QT_RecebedorPJ ?? 0,
+    });
+
+    porMunicipio.set(r.Municipio_Ibge, cur);
+  }
+
+  // 12 rankings sobre os totais históricos:
+  // {VL, QT} × {Pagador, Recebedor} × {PF, PJ, PF+PJ}.
+  const metricas = [];
+  for (const campo of ["VL", "QT"]) {
+    for (const perspectiva of ["Pagador", "Recebedor"]) {
+      metricas.push((t) => t[`${campo}_${perspectiva}PF`]);
+      metricas.push((t) => t[`${campo}_${perspectiva}PJ`]);
+      metricas.push(
+        (t) =>
+          t[`${campo}_${perspectiva}PF`] + t[`${campo}_${perspectiva}PJ`]
+      );
+    }
+  }
+
+  const todos = [...porMunicipio.values()];
+  const candidatos = new Set();
+
+  for (const metrica of metricas) {
+    [...todos]
+      .sort((a, b) => metrica(b.totais) - metrica(a.totais))
+      .slice(0, TOP_MUNICIPIOS_POR_METRICA)
+      .forEach((m) => candidatos.add(m.meta.ibge));
+  }
+
+  const municipios = todos
+    .filter((m) => candidatos.has(m.meta.ibge))
+    .map((m) => ({
+      ...m.meta,
+      serie: [...m.serie].sort((a, b) => a.AnoMes - b.AnoMes),
+    }))
+    .sort((a, b) => a.nome.localeCompare(b.nome));
+
+  return { municipios };
+}
+
 // --- Estoque de Chaves Pix por Participante ---
 // Assim como EstatisticasTransacoesPix e TransacoesPixPorMunicipio, a API
 // ignora o parâmetro Data para fins de filtro (obrigatório na assinatura, mas
@@ -296,6 +396,7 @@ async function main() {
   const municipioRows = await fetchAll("TransacoesPixPorMunicipio", "DataBase=%27202001%27", 800000);
   const municipio = buildMunicipio(municipioRows);
   const municipiosDetalhado = buildMunicipiosDetalhado(municipioRows);
+  const municipiosTop = buildMunicipiosTop(municipioRows);
 
   console.log("Baixando Estoque de Chaves Pix (~400k linhas, histórico completo desde nov/2020)...");
   const chavesRows = await fetchAll("ChavesPix", "Data=%272020-11-30%27", 600000);
@@ -311,6 +412,11 @@ async function main() {
   await writeFile(
     join(OUT_DIR, "municipios-index.json"),
     JSON.stringify({ generatedAt, municipios: municipiosDetalhado.index })
+  );
+
+  await writeFile(
+    join(OUT_DIR, "municipios-top.json"),
+    JSON.stringify({ generatedAt, municipios: municipiosTop.municipios })
   );
 
   await mkdir(MUNICIPIOS_DIR, { recursive: true });
