@@ -31,11 +31,26 @@ function App() {
   return (
     <>
       <header className="app-header">
-        <h1>Dashboard Pix</h1>
-        <p>
-          Estatísticas oficiais do Pix — dados abertos do Banco Central do Brasil. Snapshot gerado em{" "}
-          {new Date(transacoes.generatedAt).toLocaleDateString("pt-BR")}.
+        <div className="app-header__title">
+          <h1>Dashboard Pix</h1>
+        </div>
+
+        <p className="app-header__subtitle">
+          Visualizações interativas do Pix a partir dos dados abertos do Banco Central do Brasil. Snapshot
+          gerado em {new Date(transacoes.generatedAt).toLocaleDateString("pt-BR")}.
         </p>
+
+        <div className="app-header__meta">
+          <span className="app-header__author">
+            Projeto independente por{" "}
+            <a href="https://github.com/sulivanrocha" target="_blank" rel="noreferrer">
+              Sulivan Rocha
+            </a>
+          </span>
+          <span className="app-header__disclaimer">
+            Não é um serviço oficial do Banco Central. Apenas os dados são de fonte oficial.
+          </span>
+        </div>
       </header>
 
       <TabNav active={tab} onChange={setTab} />

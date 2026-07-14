@@ -126,18 +126,67 @@ input:focus {
   border-bottom: 1px solid var(--border);
 }
 
+.app-header__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-header__title::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 4px;
+  height: 26px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
 .app-header h1 {
   font-family: var(--sans);
   font-weight: 800;
   font-size: 26px;
   letter-spacing: -0.4px;
-  margin: 0 0 4px;
+  margin: 0;
 }
 
-.app-header p {
-  margin: 0;
+.app-header__subtitle {
+  margin: 8px 0 0;
   color: var(--text-secondary);
   font-size: 13px;
+  max-width: 68ch;
+  line-height: 1.5;
+}
+
+.app-header__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.app-header__author {
+  color: var(--text-muted);
+}
+
+.app-header__author a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.app-header__author a:hover {
+  text-decoration: underline;
+}
+
+.app-header__disclaimer {
+  color: var(--text-secondary);
+  background: var(--accent-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  font-weight: 500;
 }
 
 .tab-nav {
