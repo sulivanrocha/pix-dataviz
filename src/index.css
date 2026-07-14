@@ -335,11 +335,11 @@ input:focus {
 .charts-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(460px, 100%), 1fr));
-  gap: 12px;
+  gap: 16px;
 }
 
 .charts-grid + .charts-grid {
-  margin-top: 32px;
+  margin-top: 16px;
 }
 
 .chart-card {
@@ -467,7 +467,7 @@ input:focus {
   background: var(--surface-1);
   color: var(--text-primary);
   padding: 20px 22px;
-  margin-top: 12px;
+  margin-top: 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
