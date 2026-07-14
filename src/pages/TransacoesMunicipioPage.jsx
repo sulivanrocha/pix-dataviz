@@ -10,15 +10,6 @@ import {
   formatNumberCompact,
 } from "../lib/format";
 
-const REGIOES = [
-  { value: "Todas", label: "Todas as regiões" },
-  { value: "SUDESTE", label: "Sudeste" },
-  { value: "NORDESTE", label: "Nordeste" },
-  { value: "SUL", label: "Sul" },
-  { value: "NORTE", label: "Norte" },
-  { value: "CENTRO-OESTE", label: "Centro-Oeste" },
-];
-
 const PERSPECTIVAS = [
   { value: "Pagador", label: "Pagador" },
   { value: "Recebedor", label: "Recebedor" },
@@ -36,6 +27,12 @@ const VISAO_LABEL = {
   pessoas: "Pessoas",
 };
 
+const SEGMENTOS = [
+  { value: "Todos", label: "PF + PJ" },
+  { value: "PF", label: "Pessoa Física" },
+  { value: "PJ", label: "Pessoa Jurídica" },
+];
+
 const PERSPECTIVA_LABEL = {
   Pagador: "pago",
   Recebedor: "recebido",
@@ -48,19 +45,27 @@ const PERSPECTIVA_LABEL = {
  * Enquanto esses campos não forem confirmados, ela retorna um array vazio
  * para evitar apresentar transações como se fossem usuários únicos.
  */
-function getMetricFields(visao, perspectiva) {
+function getMetricFields(visao, perspectiva, segmento) {
   if (visao === "valor") {
-    return [
-      `VL_${perspectiva}PF`,
-      `VL_${perspectiva}PJ`,
-    ];
+    if (segmento === "Todos") {
+      return [
+        `VL_${perspectiva}PF`,
+        `VL_${perspectiva}PJ`,
+      ];
+    }
+
+    return [`VL_${perspectiva}${segmento}`];
   }
 
   if (visao === "transacoes") {
-    return [
-      `QT_${perspectiva}PF`,
-      `QT_${perspectiva}PJ`,
-    ];
+    if (segmento === "Todos") {
+      return [
+        `QT_${perspectiva}PF`,
+        `QT_${perspectiva}PJ`,
+      ];
+    }
+
+    return [`QT_${perspectiva}${segmento}`];
   }
 
   return [];
@@ -149,6 +154,7 @@ export function TransacoesMunicipioPage({ municipio }) {
     municipio: null,
     perspectiva: "Pagador",
     visao: "valor",
+    segmento: "Todos",
     dadosEstado: [],
   });
 
@@ -287,12 +293,14 @@ export function TransacoesMunicipioPage({ municipio }) {
   const totals = useMemo(() => {
     const valorFields = getMetricFields(
       "valor",
-      filtros.perspectiva
+      filtros.perspectiva,
+      filtros.segmento
     );
 
     const transactionFields = getMetricFields(
       "transacoes",
-      filtros.perspectiva
+      filtros.perspectiva,
+      filtros.segmento
     );
 
     const byMonth = new Set();
@@ -326,6 +334,7 @@ export function TransacoesMunicipioPage({ municipio }) {
   }, [
     dadosFiltrados,
     filtros.perspectiva,
+    filtros.segmento,
   ]);
 
   /**
@@ -416,45 +425,14 @@ export function TransacoesMunicipioPage({ municipio }) {
         }
         hint="Todos os filtros afetam os cards e gráficos da página."
       >
-        <label>
-          Região
-          <select
-            value={filtros.regiao}
-            onChange={(event) => {
-              const nextRegion =
-                event.target.value;
-
-              setFiltros((current) => ({
-                ...current,
-                regiao: nextRegion,
-                estadoIbge: "",
-                municipio: null,
-                dadosEstado: [],
-              }));
-            }}
-          >
-            {REGIOES.map((item) => (
-              <option
-                key={item.value}
-                value={item.value}
-              >
-                {item.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
         {/*
-          O MunicipioSelector deve controlar a seleção
+          O MunicipioSelector controla a seleção
           encadeada de região, estado e município.
 
           Ele permanece dentro do bloco global de filtros,
           acima dos cards.
         */}
         <MunicipioSelector
-          regiao={filtros.regiao}
-          estadoIbge={filtros.estadoIbge}
-          municipio={filtros.municipio}
           onChange={(selection) =>
             setFiltros((current) => ({
               ...current,
@@ -517,6 +495,29 @@ export function TransacoesMunicipioPage({ municipio }) {
             ))}
           </select>
         </label>
+
+        <label>
+          Segmento
+          <select
+            value={filtros.segmento}
+            onChange={(event) =>
+              setFiltros((current) => ({
+                ...current,
+                segmento:
+                  event.target.value,
+              }))
+            }
+          >
+            {SEGMENTOS.map((item) => (
+              <option
+                key={item.value}
+                value={item.value}
+              >
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </Filters>
 
       <section className="kpi-row">
@@ -546,7 +547,7 @@ export function TransacoesMunicipioPage({ municipio }) {
           regiao={filtros.regiao}
           estadoIbge={filtros.estadoIbge}
           perspectiva={filtros.perspectiva}
-          segmento="Todos"
+          segmento={filtros.segmento}
           visao={filtros.visao}
           topN={10}
           showCsvDownload
@@ -562,6 +563,7 @@ export function TransacoesMunicipioPage({ municipio }) {
           end={range.end}
           regiao={filtros.regiao}
           estadoIbge={filtros.estadoIbge}
+          segmento={filtros.segmento}
           municipio={filtros.municipio}
           serieMunicipio={serieMunicipio}
           perspectiva={filtros.perspectiva}

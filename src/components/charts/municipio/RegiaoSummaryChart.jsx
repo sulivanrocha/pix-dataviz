@@ -6,12 +6,29 @@ import { ChartCard } from "../../shared/ChartCard";
 import { ChartTooltip } from "../../shared/ChartTooltip";
 import { formatAnoMes, formatCurrencyCompact, formatCurrencyFull } from "../../../lib/format";
 
+const SEGMENTO_LABEL = {
+  Todos: "PF + PJ",
+  PF: "pessoa física",
+  PJ: "pessoa jurídica",
+};
+
 function valorField(perspectiva, seg) {
   return `VL_${perspectiva}${seg}`;
 }
 
 function quantidadeField(perspectiva, seg) {
   return `QT_${perspectiva}${seg}`;
+}
+
+function sumBySegmento(row, perspectiva, segmento, fieldFn) {
+  if (segmento === "Todos") {
+    return (
+      (Number(row[fieldFn(perspectiva, "PF")]) || 0) +
+      (Number(row[fieldFn(perspectiva, "PJ")]) || 0)
+    );
+  }
+
+  return Number(row[fieldFn(perspectiva, segmento)]) || 0;
 }
 
 export function RegiaoSummaryChart({
@@ -21,6 +38,7 @@ export function RegiaoSummaryChart({
   municipio,
   serieMunicipio,
   perspectiva,
+  segmento = "Todos",
   ultimoMesCompleto,
 }) {
   const nivelMunicipio = Boolean(municipio && serieMunicipio?.length);
@@ -38,12 +56,8 @@ export function RegiaoSummaryChart({
         .sort((a, b) => a.AnoMes - b.AnoMes)
         .map((r) => ({
           mes: formatAnoMes(r.AnoMes),
-          valor:
-            (Number(r[valorField(perspectiva, "PF")]) || 0) +
-            (Number(r[valorField(perspectiva, "PJ")]) || 0),
-          quantidade:
-            (Number(r[quantidadeField(perspectiva, "PF")]) || 0) +
-            (Number(r[quantidadeField(perspectiva, "PJ")]) || 0),
+          valor: sumBySegmento(r, perspectiva, segmento, valorField),
+          quantidade: sumBySegmento(r, perspectiva, segmento, quantidadeField),
         }));
     }
 
@@ -56,12 +70,8 @@ export function RegiaoSummaryChart({
 
     const byMonth = new Map();
     for (const r of filtered) {
-      const valor =
-        (Number(r[valorField(perspectiva, "PF")]) || 0) +
-        (Number(r[valorField(perspectiva, "PJ")]) || 0);
-      const quantidade =
-        (Number(r[quantidadeField(perspectiva, "PF")]) || 0) +
-        (Number(r[quantidadeField(perspectiva, "PJ")]) || 0);
+      const valor = sumBySegmento(r, perspectiva, segmento, valorField);
+      const quantidade = sumBySegmento(r, perspectiva, segmento, quantidadeField);
 
       const prev = byMonth.get(r.AnoMes) ?? { valor: 0, quantidade: 0 };
       byMonth.set(r.AnoMes, {
@@ -81,6 +91,7 @@ export function RegiaoSummaryChart({
     regiao,
     estadoIbge,
     perspectiva,
+    segmento,
     nivelMunicipio,
     serieMunicipio,
     ultimoMesCompleto,
@@ -99,7 +110,7 @@ export function RegiaoSummaryChart({
   return (
     <ChartCard
       title={`Total ${perspectivaLabel}: ${scopeLabel}`}
-      subtitle="Soma mensal de PF + PJ, atualizada conforme os filtros desta seção."
+      subtitle={`Soma mensal de ${SEGMENTO_LABEL[segmento]}, atualizada conforme os filtros desta seção.`}
       fullWidth
     >
       <ResponsiveContainer width="100%" height={280}>

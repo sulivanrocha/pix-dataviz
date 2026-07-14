@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 const REGIOES = [
+  { value: "Todas", label: "Todas as regiões" },
   { value: "NORTE", label: "Norte" },
   { value: "NORDESTE", label: "Nordeste" },
   { value: "CENTRO-OESTE", label: "Centro-Oeste" },
@@ -17,7 +18,7 @@ export function MunicipioSelector({ onChange = () => {} }) {
   const [index, setIndex] = useState([]);
   const [indexStatus, setIndexStatus] = useState("loading");
 
-  const [regiao, setRegiao] = useState("");
+  const [regiao, setRegiao] = useState("Todas");
   const [estadoIbge, setEstadoIbge] = useState("");
   const [municipioIbge, setMunicipioIbge] = useState("");
   const [query, setQuery] = useState("");
@@ -48,10 +49,9 @@ export function MunicipioSelector({ onChange = () => {} }) {
   }, []);
 
   const estados = useMemo(() => {
-    if (!regiao) return [];
     const map = new Map();
     for (const m of index) {
-      if (m.regiao === regiao && !map.has(m.estadoIbge)) {
+      if ((regiao === "Todas" || m.regiao === regiao) && !map.has(m.estadoIbge)) {
         map.set(m.estadoIbge, { estadoIbge: m.estadoIbge, nome: m.estado, uf: m.uf });
       }
     }
@@ -142,9 +142,6 @@ export function MunicipioSelector({ onChange = () => {} }) {
           onChange={(e) => handleRegiaoChange(e.target.value)}
           disabled={!indexPronto}
         >
-          <option value="" disabled>
-            Selecione a região
-          </option>
           {REGIOES.map((r) => (
             <option key={r.value} value={r.value}>
               {r.label}
@@ -158,7 +155,6 @@ export function MunicipioSelector({ onChange = () => {} }) {
         <select
           value={estadoIbge}
           onChange={(e) => handleEstadoChange(e.target.value)}
-          disabled={!regiao}
         >
           <option value="" disabled>
             Selecione o estado
