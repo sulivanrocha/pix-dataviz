@@ -2,6 +2,7 @@ import { useState } from "react";
 import { usePixData } from "./lib/usePixData";
 import { TabNav } from "./components/shared/TabNav";
 import { TABS } from "./lib/tabs";
+import { OverviewPage } from "./pages/OverviewPage";
 import { UsuariosDictPage } from "./pages/UsuariosDictPage";
 import { ChavesPixPage } from "./pages/ChavesPixPage";
 import { TransacoesMunicipioPage } from "./pages/TransacoesMunicipioPage";
@@ -55,6 +56,7 @@ function App() {
 
       <TabNav active={tab} onChange={setTab} />
 
+      {tab === "overview" && <OverviewPage />}
       {tab === "dict" && <UsuariosDictPage usuariosDict={usuariosDict.dados} />}
       {tab === "chaves" && <ChavesPixPage chaves={chaves} />}
       {tab === "municipio" && <TransacoesMunicipioPage municipio={municipio} />}
