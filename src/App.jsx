@@ -64,11 +64,25 @@ function App() {
 
       <footer className="app-footer">
         Fonte: API pública de{" "}
-        <a href="https://dadosabertos.bcb.gov.br/dataset/pix" target="_blank" rel="noreferrer">
+        <a
+          href="https://dadosabertos.bcb.gov.br/dataset/pix"
+          target="_blank"
+          rel="noreferrer"
+        >
           Dados Abertos do Banco Central do Brasil
         </a>
-        . Dados servidos como snapshot estático — reexecute <code>node scripts/fetch-data.mjs</code> para atualizar.
-      </footer>
+        . Código-fonte disponível no{" "}
+        <a
+          href="https://github.com/sulivanrocha/pix-dataviz"
+          target="_blank"
+          rel="noreferrer"
+        >
+          GitHub
+        </a>
+        .
+        </footer>
+
+
     </>
   );
 }
