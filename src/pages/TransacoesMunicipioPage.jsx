@@ -1,228 +1,125 @@
-import { useMemo, useState } from "react";
-import { Filters } from "../components/shared/Filters";
-import { StatTile } from "../components/shared/StatTile";
-import { StateRanking } from "../components/charts/municipio/StateRanking";
-import { RegiaoSummaryChart } from "../components/charts/municipio/RegiaoSummaryChart";
-import { MunicipioSelector } from "../components/MunicipioSelector";
-import { MunicipioPFPJChart } from "../components/MunicipioPFPJChart";
-import { formatCurrencyCompact, formatCurrencyFull, formatNumberCompact } from "../lib/format";
-
-const REGIOES = [
-  { value: "Todas", label: "Todas as regiões" },
-  { value: "SUDESTE", label: "Sudeste" },
-  { value: "NORDESTE", label: "Nordeste" },
-  { value: "SUL", label: "Sul" },
-  { value: "NORTE", label: "Norte" },
-  { value: "CENTRO-OESTE", label: "Centro-Oeste" },
-];
-
-const PERSPECTIVAS = [
-  { value: "Pagador", label: "Pagador" },
-  { value: "Recebedor", label: "Recebedor" },
-];
-
-const SEGMENTOS = [
-  { value: "Todos", label: "Todos (PF + PJ)" },
-  { value: "PF", label: "Pessoa física (PF)" },
-  { value: "PJ", label: "Pessoa jurídica (PJ)" },
-];
-
-function valorFields(perspectiva, segmento) {
-  if (segmento === "Todos") return [`VL_${perspectiva}PF`, `VL_${perspectiva}PJ`];
-  return [`VL_${perspectiva}${segmento}`];
-}
-
-function quantidadeFields(perspectiva, segmento) {
-  if (segmento === "Todos") return [`QT_${perspectiva}PF`, `QT_${perspectiva}PJ`];
-  return [`QT_${perspectiva}${segmento}`];
-}
-
-export function TransacoesMunicipioPage({ municipio }) {
-  const ultimoMesCompleto = useMemo(() => {
-    const hoje = new Date();
-    const ultimoDiaMesAnterior = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
-    return ultimoDiaMesAnterior.getFullYear() * 100 + (ultimoDiaMesAnterior.getMonth() + 1);
-  }, []);
-
-  const months = useMemo(
-    () =>
-      [...new Set(
-        municipio.porEstadoMensal
-          .map((r) => r.AnoMes)
-          .filter((anoMes) => anoMes <= ultimoMesCompleto)
-      )].sort((a, b) => a - b),
-    [municipio, ultimoMesCompleto]
-  );
-  const [start, setStart] = useState(null);
-  const [end, setEnd] = useState(null);
-  const [regiao, setRegiao] = useState("Todas");
-  const [perspectiva, setPerspectiva] = useState("Pagador");
-  const [segmento, setSegmento] = useState("Todos");
-  const range = { start: start ?? months[0], end: end ?? months[months.length - 1] };
-
-  const [selecaoMunicipio, setSelecaoMunicipio] = useState({
-    regiao: null,
-    estadoIbge: null,
-    municipio: null,
-    dadosEstado: [],
-  });
-
-  const serieMunicipio = useMemo(() => {
-    if (!selecaoMunicipio.municipio) return [];
-    return selecaoMunicipio.dadosEstado.filter(
-      (r) =>
-        r.Municipio_Ibge === selecaoMunicipio.municipio.ibge &&
-        r.AnoMes <= ultimoMesCompleto
-    );
-  }, [selecaoMunicipio, ultimoMesCompleto]);
-
-  const seriePFPJ = useMemo(() => {
-    if (serieMunicipio.length > 0) return serieMunicipio;
-
-    const filtered = municipio.porEstadoMensal.filter((r) => {
-      if (r.AnoMes > ultimoMesCompleto) return false;
-      if (selecaoMunicipio.estadoIbge) return r.Estado_Ibge === selecaoMunicipio.estadoIbge;
-      if (selecaoMunicipio.regiao && selecaoMunicipio.regiao !== "Todas") {
-        return r.Regiao === selecaoMunicipio.regiao;
+return (
+  <>
+    <Filters
+      months={months}
+      start={range.start}
+      end={range.end}
+      onStartChange={(value) =>
+        setFiltros((current) => ({ ...current, start: value }))
       }
-      return true;
-    });
+      onEndChange={(value) =>
+        setFiltros((current) => ({ ...current, end: value }))
+      }
+      hint="Todos os filtros abaixo afetam os cards e gráficos da página."
+    >
+      <label>
+        Região
+        <select
+          value={filtros.regiao}
+          onChange={(event) =>
+            setFiltros((current) => ({
+              ...current,
+              regiao: event.target.value,
+              estadoIbge: "",
+              municipio: null,
+              dadosEstado: [],
+            }))
+          }
+        >
+          {REGIOES.map((item) => (
+            <option key={item.value} value={item.value}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+      </label>
 
-    const byMonth = new Map();
-    for (const row of filtered) {
-      const current = byMonth.get(row.AnoMes) ?? { AnoMes: row.AnoMes };
-      for (const [key, value] of Object.entries(row)) {
-        if (key.startsWith("VL_") || key.startsWith("QT_")) {
-          current[key] = (Number(current[key]) || 0) + (Number(value) || 0);
+      <MunicipioSelector
+        regiao={filtros.regiao}
+        estadoIbge={filtros.estadoIbge}
+        municipio={filtros.municipio}
+        onChange={(selection) =>
+          setFiltros((current) => ({
+            ...current,
+            regiao: selection.regiao || "Todas",
+            estadoIbge: selection.estadoIbge || "",
+            municipio: selection.municipio || null,
+            dadosEstado: selection.dadosEstado || [],
+          }))
         }
-      }
-      byMonth.set(row.AnoMes, current);
-    }
+      />
 
-    return [...byMonth.values()].sort((a, b) => a.AnoMes - b.AnoMes);
-  }, [
-    municipio.porEstadoMensal,
-    selecaoMunicipio.estadoIbge,
-    selecaoMunicipio.regiao,
-    serieMunicipio,
-    ultimoMesCompleto,
-  ]);
+      <label>
+        Perspectiva
+        <select
+          value={filtros.perspectiva}
+          onChange={(event) =>
+            setFiltros((current) => ({
+              ...current,
+              perspectiva: event.target.value,
+            }))
+          }
+        >
+          {PERSPECTIVAS.map((item) => (
+            <option key={item.value} value={item.value}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+      </label>
 
-  const totals = useMemo(() => {
-    const vFields = valorFields(perspectiva, segmento);
-    const qFields = quantidadeFields(perspectiva, segmento);
+      <label>
+        Visão
+        <select
+          value={filtros.visao}
+          onChange={(event) =>
+            setFiltros((current) => ({
+              ...current,
+              visao: event.target.value,
+            }))
+          }
+        >
+          {VISOES.map((item) => (
+            <option key={item.value} value={item.value}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+      </label>
+    </Filters>
 
-    const filtered = municipio.porEstadoMensal.filter(
-      (r) => r.AnoMes >= range.start && r.AnoMes <= range.end && (regiao === "Todas" || r.Regiao === regiao)
-    );
+    <section className="kpi-row">
+      {/* Cards calculados com os mesmos filtros globais */}
+    </section>
 
-    return filtered.reduce(
-      (acc, r) => {
-        acc.valor += vFields.reduce((sum, field) => sum + (Number(r[field]) || 0), 0);
-        acc.quantidade += qFields.reduce((sum, field) => sum + (Number(r[field]) || 0), 0);
-        return acc;
-      },
-      { valor: 0, quantidade: 0 }
-    );
-  }, [municipio, range.start, range.end, regiao, perspectiva, segmento]);
-
-  const perspectivaLabel = perspectiva === "Pagador" ? "pago" : "recebido";
-
-  return (
-    <>
-      <section className="kpi-row">
-        <StatTile label={`Valor ${perspectivaLabel} no período`} value={formatCurrencyCompact(totals.valor)} />
-        <StatTile label={`Transações (${perspectivaLabel}s) no período`} value={formatNumberCompact(totals.quantidade)} />
-        <StatTile
-          label="Ticket médio"
-          value={totals.quantidade > 0 ? formatCurrencyFull(totals.valor / totals.quantidade) : "—"}
-        />
-      </section>
-
-      <Filters
-        months={months}
+    <section className="charts-grid">
+      <StateRanking
+        porEstadoMensal={municipio.porEstadoMensal}
         start={range.start}
         end={range.end}
-        onStartChange={setStart}
-        onEndChange={setEnd}
-        hint="Filtra o ranking de estados abaixo."
-      >
-        <label>
-          Região
-          <select value={regiao} onChange={(e) => setRegiao(e.target.value)}>
-            {REGIOES.map((r) => (
-              <option key={r.value} value={r.value}>
-                {r.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        regiao={filtros.regiao}
+        estadoIbge={filtros.estadoIbge}
+        perspectiva={filtros.perspectiva}
+        visao={filtros.visao}
+        topN={10}
+        showCsvDownload
+      />
+    </section>
 
-        <label>
-          Perspectiva
-          <select value={perspectiva} onChange={(e) => setPerspectiva(e.target.value)}>
-            {PERSPECTIVAS.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          Segmento
-          <select value={segmento} onChange={(e) => setSegmento(e.target.value)}>
-            {SEGMENTOS.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </Filters>
-
-      <section className="charts-grid">
-        <StateRanking
-          porEstadoMensal={municipio.porEstadoMensal}
-          start={range.start}
-          end={range.end}
-          regiao={regiao}
-          perspectiva={perspectiva}
-          segmento={segmento}
-        />
-      </section>
-
-      <section className="municipio-analysis-block">
-        <div className="municipio-analysis-filters">
-          <MunicipioSelector
-            onChange={(s) =>
-              setSelecaoMunicipio({
-                regiao: s.regiao || null,
-                estadoIbge: s.estadoIbge || null,
-                municipio: s.municipio,
-                dadosEstado: s.dadosEstado,
-              })
-            }
-          />
-        </div>
-
-        <section className="charts-grid">
-          <RegiaoSummaryChart
-            porEstadoMensal={municipio.porEstadoMensal}
-            regiao={selecaoMunicipio.regiao}
-            estadoIbge={selecaoMunicipio.estadoIbge}
-            municipio={selecaoMunicipio.municipio}
-            serieMunicipio={serieMunicipio}
-            perspectiva={perspectiva}
-            ultimoMesCompleto={ultimoMesCompleto}
-          />
-        </section>
-
-        <section className="charts-grid">
-          <MunicipioPFPJChart serieMensal={seriePFPJ} tipo="PF" />
-          <MunicipioPFPJChart serieMensal={seriePFPJ} tipo="PJ" />
-        </section>
-      </section>
-    </>
-  );
-}
+    <section className="charts-grid">
+      <RegiaoSummaryChart
+        porEstadoMensal={municipio.porEstadoMensal}
+        start={range.start}
+        end={range.end}
+        regiao={filtros.regiao}
+        estadoIbge={filtros.estadoIbge}
+        municipio={filtros.municipio}
+        serieMunicipio={serieMunicipio}
+        perspectiva={filtros.perspectiva}
+        visao={filtros.visao}
+        ultimoMesCompleto={ultimoMesCompleto}
+        showCsvDownload
+      />
+    </section>
+  </>
+);
