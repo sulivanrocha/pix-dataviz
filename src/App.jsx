@@ -1,7 +1,12 @@
-import { useState } from "react";
+// src/App.jsx
+// Rotas, cabeçalho e rodapé. O estado de aba agora vive na URL (react-router),
+// não em useState — é isso que dá ao Google cinco páginas indexáveis em vez de uma.
+
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { usePixData } from "./lib/usePixData";
 import { TabNav } from "./components/shared/TabNav";
-import { TABS } from "./lib/tabs";
+import { tabFromPath } from "./lib/tabs";
+import { useDocumentMeta } from "./lib/useDocumentMeta";
 import { OverviewPage } from "./pages/OverviewPage";
 import { UsuariosDictPage } from "./pages/UsuariosDictPage";
 import { ChavesPixPage } from "./pages/ChavesPixPage";
@@ -10,7 +15,12 @@ import { EstatisticasTransacoesPage } from "./pages/EstatisticasTransacoesPage";
 
 function App() {
   const { status, data, error } = usePixData();
-  const [tab, setTab] = useState(TABS[0].key);
+  const location = useLocation();
+  const tab = tabFromPath(location.pathname);
+
+  // Precisa ficar acima dos early returns: hooks não podem vir depois de
+  // um return condicional. tabFromPath só depende da URL, então é seguro.
+  useDocumentMeta(tab);
 
   if (status === "loading") {
     return <p className="state-message">Carregando dados do Pix...</p>;
@@ -54,13 +64,16 @@ function App() {
         </div>
       </header>
 
-      <TabNav active={tab} onChange={setTab} />
+      <TabNav />
 
-      {tab === "overview" && <OverviewPage />}
-      {tab === "dict" && <UsuariosDictPage usuariosDict={usuariosDict.dados} />}
-      {tab === "chaves" && <ChavesPixPage chaves={chaves} />}
-      {tab === "municipio" && <TransacoesMunicipioPage municipio={municipio} />}
-      {tab === "transacoes" && <EstatisticasTransacoesPage transacoes={transacoes} />}
+      <Routes>
+        <Route path="/" element={<OverviewPage />} />
+        <Route path="/usuarios" element={<UsuariosDictPage usuariosDict={usuariosDict.dados} />} />
+        <Route path="/chaves" element={<ChavesPixPage chaves={chaves} />} />
+        <Route path="/municipios" element={<TransacoesMunicipioPage municipio={municipio} />} />
+        <Route path="/transacoes" element={<EstatisticasTransacoesPage transacoes={transacoes} />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
 
       <footer className="app-footer">
         Fonte: API pública de{" "}
@@ -80,9 +93,7 @@ function App() {
           GitHub
         </a>
         .
-        </footer>
-
-
+      </footer>
     </>
   );
 }

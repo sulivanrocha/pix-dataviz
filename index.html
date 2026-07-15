@@ -4,11 +4,85 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/pixicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dados do Pix</title>
+
+    <!-- Metadados padrão (home). São sobrescritos por rota em useDocumentMeta.js
+         para o Googlebot, mas scrapers de redes sociais não executam JS e leem
+         apenas o que está aqui. Devem espelhar TABS[0] em src/lib/tabs.js. -->
+    <title>Dados do Pix — visualizações dos dados abertos do Banco Central</title>
     <meta
       name="description"
-      content="Visualizações interativas dos dados abertos do Pix (Banco Central do Brasil): transações, chaves, municípios e fluxos entre pessoas, empresas e governo. Projeto independente, sem vínculo com o BCB."
+      content="Painel independente com as estatísticas públicas do Pix: usuários, chaves, transações por município e volume mensal. Dados abertos do Banco Central do Brasil em gráficos interativos."
     />
+    <link rel="canonical" href="https://www.dadospix.com.br/" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta name="author" content="Sulivan Rocha" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Dados do Pix" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:title" content="Dados do Pix — visualizações dos dados abertos do Banco Central" />
+    <meta
+      property="og:description"
+      content="Painel independente com as estatísticas públicas do Pix: usuários, chaves, transações por município e volume mensal. Dados abertos do Banco Central do Brasil em gráficos interativos."
+    />
+    <meta property="og:url" content="https://www.dadospix.com.br/" />
+    <meta property="og:image" content="https://www.dadospix.com.br/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Dados do Pix — visualizações dos dados abertos do Banco Central" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Dados do Pix — visualizações dos dados abertos do Banco Central" />
+    <meta
+      name="twitter:description"
+      content="Painel independente com as estatísticas públicas do Pix: usuários, chaves, transações por município e volume mensal. Dados abertos do Banco Central do Brasil em gráficos interativos."
+    />
+    <meta name="twitter:image" content="https://www.dadospix.com.br/og.png" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Dataset",
+        "name": "Dados do Pix — estatísticas públicas do Pix (Banco Central do Brasil)",
+        "description": "Visualizações interativas dos dados abertos do Pix: usuários cadastrados no DICT, chaves Pix por tipo e instituição, transações por município, estado e região, e estatísticas mensais de valor e volume de transações.",
+        "url": "https://www.dadospix.com.br/",
+        "inLanguage": "pt-BR",
+        "keywords": [
+          "Pix",
+          "Banco Central do Brasil",
+          "dados abertos",
+          "pagamentos instantâneos",
+          "DICT",
+          "chaves Pix",
+          "transações Pix",
+          "estatísticas financeiras",
+          "Brasil"
+        ],
+        "creator": {
+          "@type": "Person",
+          "name": "Sulivan Rocha",
+          "url": "https://www.linkedin.com/in/sulivanrocha/"
+        },
+        "isBasedOn": {
+          "@type": "Dataset",
+          "name": "Pix — Dados Abertos do Banco Central do Brasil",
+          "url": "https://dadosabertos.bcb.gov.br/dataset/pix"
+        },
+        "creativeWorkStatus": "Published",
+        "isAccessibleForFree": true,
+        "distribution": [
+          {
+            "@type": "DataDownload",
+            "name": "Snapshots JSON estáticos",
+            "encodingFormat": "application/json",
+            "contentUrl": "https://www.dadospix.com.br/data/"
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

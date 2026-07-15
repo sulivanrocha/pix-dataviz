@@ -197,7 +197,7 @@ input:focus {
   overflow-x: auto;
 }
 
-.tab-nav button {
+.tab-nav a {
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -208,17 +208,18 @@ input:focus {
   padding: 9px 12px;
   cursor: pointer;
   white-space: nowrap;
+  text-decoration: none;
+  display: inline-block;
 }
 
-.tab-nav button.active {
+.tab-nav a.active {
   color: var(--text-primary);
   border-bottom-color: var(--accent);
 }
 
-.tab-nav button:hover {
+.tab-nav a:hover {
   color: var(--text-primary);
 }
-
 
 .filters-row {
   display: flex;
