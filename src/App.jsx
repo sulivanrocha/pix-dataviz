@@ -33,7 +33,7 @@ function App() {
     <>
       <header className="app-header">
         <div className="app-header__title">
-          <h1>Dashboard Pix</h1>
+          <h1>Dados do Pix</h1>
         </div>
 
         <p className="app-header__subtitle">
