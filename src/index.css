@@ -762,30 +762,40 @@ input:focus {
 .natureza-matrix-table tbody th {
   text-align: right;
   white-space: nowrap;
+  width: 88px;
 }
 
+/*
+  Célula de canto: ancora os dois eixos.
+  RECEBEDOR aponta para os cabeçalhos de coluna (acima, à direita);
+  PAGADOR aponta para os cabeçalhos de linha (abaixo, à esquerda).
+*/
 .natureza-matrix-corner {
   position: relative;
-  height: 44px;
+  width: 88px;
+  padding: 0;
 }
 
 .natureza-matrix-corner-pagador,
 .natureza-matrix-corner-recebedor {
-  display: block;
-  font-size: 10px;
+  position: absolute;
+  font-size: 9.5px;
   font-weight: 500;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  line-height: 1.4;
-}
-
-.natureza-matrix-corner-pagador {
-  text-align: left;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .natureza-matrix-corner-recebedor {
-  text-align: right;
+  top: 4px;
+  right: 8px;
+}
+
+.natureza-matrix-corner-pagador {
+  bottom: 4px;
+  left: 0;
 }
 
 .natureza-matrix-table td {
@@ -834,6 +844,21 @@ input:focus {
 @media (max-width: 640px) {
   .natureza-matrix-table {
     border-spacing: 2px;
+  }
+
+  .natureza-matrix-table tbody th,
+  .natureza-matrix-corner {
+    width: 62px;
+  }
+
+  .natureza-matrix-table tbody th {
+    font-size: 11px;
+    padding: 6px 4px;
+  }
+
+  .natureza-matrix-corner-pagador,
+  .natureza-matrix-corner-recebedor {
+    font-size: 8.5px;
   }
 
   .natureza-matrix-table td {
