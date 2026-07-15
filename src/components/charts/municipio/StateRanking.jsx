@@ -36,6 +36,19 @@ const VISAO_LABEL = {
   pessoas: "pessoas",
 };
 
+/**
+ * Prefixo do campo de cada visão.
+ *
+ * VL_  -> volume financeiro
+ * QT_  -> quantidade de transações
+ * QT_PES_ -> quantidade de pessoas distintas no mês
+ */
+const VISAO_PREFIXO = {
+  valor: "VL_",
+  transacoes: "QT_",
+  pessoas: "QT_PES_",
+};
+
 function toTitleCase(value = "") {
   return value.replace(/\S+/g, (word) => {
     return word[0] + word.slice(1).toLowerCase();
@@ -43,58 +56,40 @@ function toTitleCase(value = "") {
 }
 
 /**
+ * AAAAMM -> MM/AAAA.
+ */
+function formatMesReferencia(anoMes) {
+  if (!anoMes) {
+    return "";
+  }
+
+  const ano = Math.floor(anoMes / 100);
+  const mes = String(anoMes % 100).padStart(2, "0");
+
+  return `${mes}/${ano}`;
+}
+
+/**
  * Retorna os campos que serão somados de acordo com:
  * - perspectiva: Pagador ou Recebedor
  * - segmento: Todos, PF ou PJ
  * - visão: valor, transações ou pessoas
- *
- * Para a visão "pessoas", os nomes dos campos devem ser informados
- * através da prop pessoasFields, pois eles dependem da estrutura da API.
  */
-function getMetricFields({
-  perspectiva,
-  segmento,
-  visao,
-  pessoasFields,
-}) {
-  if (visao === "valor") {
-    if (segmento === "Todos") {
-      return [
-        `VL_${perspectiva}PF`,
-        `VL_${perspectiva}PJ`,
-      ];
-    }
+function getMetricFields({ perspectiva, segmento, visao }) {
+  const prefixo = VISAO_PREFIXO[visao];
 
-    return [`VL_${perspectiva}${segmento}`];
+  if (!prefixo) {
+    return [];
   }
 
-  if (visao === "transacoes") {
-    if (segmento === "Todos") {
-      return [
-        `QT_${perspectiva}PF`,
-        `QT_${perspectiva}PJ`,
-      ];
-    }
-
-    return [`QT_${perspectiva}${segmento}`];
-  }
-
-  if (visao === "pessoas") {
-    if (!pessoasFields) return [];
-
-    if (segmento === "Todos") {
-      return [
-        pessoasFields?.[perspectiva]?.PF,
-        pessoasFields?.[perspectiva]?.PJ,
-      ].filter(Boolean);
-    }
-
+  if (segmento === "Todos") {
     return [
-      pessoasFields?.[perspectiva]?.[segmento],
-    ].filter(Boolean);
+      `${prefixo}${perspectiva}PF`,
+      `${prefixo}${perspectiva}PJ`,
+    ];
   }
 
-  return [];
+  return [`${prefixo}${perspectiva}${segmento}`];
 }
 
 function getMetricConfig(visao) {
@@ -142,6 +137,7 @@ function downloadCsv({
   visao,
   start,
   end,
+  mesReferencia,
 }) {
   if (!rows.length) return;
 
@@ -176,9 +172,18 @@ function downloadCsv({
   const perspectivaSlug =
     perspectiva.toLowerCase();
 
+  /*
+   * Em Pessoas o recorte é um único mês, não um intervalo:
+   * o nome do arquivo precisa refletir o que foi realmente calculado.
+   */
+  const periodoSlug =
+    visao === "pessoas"
+      ? `${mesReferencia}`
+      : `${start}-${end}`;
+
   link.href = url;
   link.download =
-    `pix-top-estados-${visao}-${perspectivaSlug}-${start}-${end}.csv`;
+    `pix-top-estados-${visao}-${perspectivaSlug}-${periodoSlug}.csv`;
 
   document.body.appendChild(link);
   link.click();
@@ -198,25 +203,6 @@ export function StateRanking({
   visao = "valor",
 
   /**
-   * Informe esta prop quando soubermos os nomes exatos
-   * dos campos de pessoas na base.
-   *
-   * Exemplo:
-   *
-   * pessoasFields={{
-   *   Pagador: {
-   *     PF: "QT_PessoasPagadorPF",
-   *     PJ: "QT_PessoasPagadorPJ",
-   *   },
-   *   Recebedor: {
-   *     PF: "QT_PessoasRecebedorPF",
-   *     PJ: "QT_PessoasRecebedorPJ",
-   *   },
-   * }}
-   */
-  pessoasFields = null,
-
-  /**
    * Quando o card divide a linha com outro gráfico
    * (ex.: ranking de municípios), deixe como false.
    */
@@ -233,30 +219,57 @@ export function StateRanking({
         perspectiva,
         segmento,
         visao,
-        pessoasFields,
       }),
-    [
-      perspectiva,
-      segmento,
-      visao,
-      pessoasFields,
-    ]
+    [perspectiva, segmento, visao]
   );
 
+  /**
+   * Mês de referência da visão Pessoas: o último mês com dados dentro do
+   * intervalo filtrado.
+   *
+   * QT_PES_* conta pessoas distintas em um mês; somar meses contaria a mesma
+   * pessoa várias vezes. Por isso o ranking de Pessoas é um retrato de um mês
+   * — o início do intervalo não o afeta.
+   */
+  const mesReferencia = useMemo(() => {
+    if (visao !== "pessoas") {
+      return null;
+    }
+
+    const meses = porEstadoMensal
+      .map((row) => Number(row.AnoMes))
+      .filter(
+        (anoMes) =>
+          Number.isFinite(anoMes) &&
+          anoMes >= start &&
+          anoMes <= end
+      );
+
+    return meses.length > 0
+      ? Math.max(...meses)
+      : null;
+  }, [porEstadoMensal, start, end, visao]);
+
   const rows = useMemo(() => {
-    /*
-     * Evita mostrar valores incorretos na visão Pessoas
-     * enquanto os campos específicos não forem configurados.
-     */
     if (!metricFields.length) {
+      return [];
+    }
+
+    if (visao === "pessoas" && mesReferencia === null) {
       return [];
     }
 
     const filtered = porEstadoMensal.filter(
       (row) => {
+        /*
+         * Valor e Transações acumulam o intervalo inteiro.
+         * Pessoas usa somente o mês de referência.
+         */
         const dentroDoPeriodo =
-          row.AnoMes >= start &&
-          row.AnoMes <= end;
+          visao === "pessoas"
+            ? Number(row.AnoMes) === mesReferencia
+            : row.AnoMes >= start &&
+              row.AnoMes <= end;
 
         const dentroDaRegiao =
           regiao === "Todas" ||
@@ -313,6 +326,8 @@ export function StateRanking({
     regiao,
     estadoIbge,
     metricFields,
+    visao,
+    mesReferencia,
   ]);
 
   const perspectiveText =
@@ -320,6 +335,9 @@ export function StateRanking({
 
   const metricText =
     VISAO_LABEL[visao];
+
+  const mesReferenciaLabel =
+    formatMesReferencia(mesReferencia);
 
   const title = estadoIbge
     ? `${metricText} ${perspectiveText} no estado selecionado`
@@ -329,15 +347,16 @@ export function StateRanking({
     (!regiao || regiao === "Todas") &&
     !estadoIbge;
 
+  const escopoTexto = escopoNacional
+    ? " Brasil inteiro — não é afetado pelos filtros de região, estado e município."
+    : "";
+
   const subtitle =
-    visao === "pessoas" &&
-    !metricFields.length
-      ? "Os campos de pessoas ainda precisam ser configurados de acordo com a estrutura da base."
-      : `${SEGMENTO_LABEL[segmento]}, perspectiva ${perspectiva.toLowerCase()}, no período filtrado.${
-          escopoNacional
-            ? " Brasil inteiro — não é afetado pelos filtros de região, estado e município."
-            : ""
-        }`;
+    visao === "pessoas"
+      ? `${SEGMENTO_LABEL[segmento]}, perspectiva ${perspectiva.toLowerCase()}. Pessoas distintas em ${
+          mesReferenciaLabel || "—"
+        }, último mês do intervalo — contagens mensais não se somam ao longo do período.${escopoTexto}`
+      : `${SEGMENTO_LABEL[segmento]}, perspectiva ${perspectiva.toLowerCase()}, no período filtrado.${escopoTexto}`;
 
   const actions = (
     <button
@@ -351,6 +370,7 @@ export function StateRanking({
           visao,
           start,
           end,
+          mesReferencia,
         })
       }
     >
@@ -445,9 +465,7 @@ export function StateRanking({
         </ResponsiveContainer>
       ) : (
         <div className="state-message">
-          {visao === "pessoas"
-            ? "Configure os campos da visão Pessoas para exibir este gráfico."
-            : "Não há dados para os filtros selecionados."}
+          Não há dados para os filtros selecionados.
         </div>
       )}
     </ChartCard>

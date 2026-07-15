@@ -33,6 +33,15 @@ function quantidadeField(perspectiva, seg) {
   return `QT_${perspectiva}${seg}`;
 }
 
+// QT_PES_*: pessoas distintas no mês. Somar PF + PJ dentro do mesmo mês e da
+// mesma geografia é válido (cadastros distintos), assim como somar estados
+// dentro de um mês — o BCB aloca cada pessoa ao município do seu domicílio
+// bancário. Este gráfico é justamente o recorte onde isso vale: cada barra é
+// um mês isolado, nunca um acumulado.
+function pessoasField(perspectiva, seg) {
+  return `QT_PES_${perspectiva}${seg}`;
+}
+
 function sumBySegmento(row, perspectiva, segmento, fieldFn) {
   if (segmento === "Todos") {
     return (
@@ -44,9 +53,7 @@ function sumBySegmento(row, perspectiva, segmento, fieldFn) {
   return Number(row[fieldFn(perspectiva, segmento)]) || 0;
 }
 
-// Configuração de série/formatadores por visão. A visão "pessoas" retorna
-// null: os campos QT_PES contam pessoas distintas por mês e não podem ser
-// somados no período, então o gráfico exibe uma mensagem em vez de dados.
+// Configuração de série/formatadores por visão.
 function getMetricConfig(visao) {
   if (visao === "valor") {
     return {
@@ -61,6 +68,15 @@ function getMetricConfig(visao) {
     return {
       dataKey: "quantidade",
       seriesName: "Transações",
+      axisFormatter: formatNumberCompact,
+      tooltipFormatter: formatNumberCompact,
+    };
+  }
+
+  if (visao === "pessoas") {
+    return {
+      dataKey: "pessoas",
+      seriesName: "Pessoas",
       axisFormatter: formatNumberCompact,
       tooltipFormatter: formatNumberCompact,
     };
@@ -108,6 +124,7 @@ export function RegiaoSummaryChart({
           mes: formatAnoMes(r.AnoMes),
           valor: sumBySegmento(r, perspectiva, segmento, valorField),
           quantidade: sumBySegmento(r, perspectiva, segmento, quantidadeField),
+          pessoas: sumBySegmento(r, perspectiva, segmento, pessoasField),
         }));
     }
 
@@ -118,15 +135,19 @@ export function RegiaoSummaryChart({
       return true;
     });
 
+    // A chave do agrupamento é AnoMes: as somas abaixo cruzam apenas estados
+    // dentro de um mesmo mês, o que mantém QT_PES_* correto.
     const byMonth = new Map();
     for (const r of filtered) {
       const valor = sumBySegmento(r, perspectiva, segmento, valorField);
       const quantidade = sumBySegmento(r, perspectiva, segmento, quantidadeField);
+      const pessoas = sumBySegmento(r, perspectiva, segmento, pessoasField);
 
-      const prev = byMonth.get(r.AnoMes) ?? { valor: 0, quantidade: 0 };
+      const prev = byMonth.get(r.AnoMes) ?? { valor: 0, quantidade: 0, pessoas: 0 };
       byMonth.set(r.AnoMes, {
         valor: prev.valor + valor,
         quantidade: prev.quantidade + quantidade,
+        pessoas: prev.pessoas + pessoas,
       });
     }
 
@@ -160,13 +181,20 @@ export function RegiaoSummaryChart({
   const tituloMetrica =
     TITULO_METRICA[visao]?.[perspectiva] ?? "Série histórica";
 
+  // Em Pessoas cada barra é uma contagem independente do mês — falar em "soma
+  // mensal" sugeriria um acumulado que não existe.
+  const subtitle =
+    visao === "pessoas"
+      ? `Pessoas distintas de ${SEGMENTO_LABEL[segmento]} em cada mês, atualizada conforme todos os filtros da página. As barras não se acumulam: quem transaciona em vários meses é contado em cada um deles.`
+      : `Soma mensal de ${SEGMENTO_LABEL[segmento]}, atualizada conforme todos os filtros da página.`;
+
   return (
     <ChartCard
       title={`${tituloMetrica}, mês a mês: ${scopeLabel}`}
-      subtitle={`Soma mensal de ${SEGMENTO_LABEL[segmento]}, atualizada conforme todos os filtros da página.`}
+      subtitle={subtitle}
       fullWidth
     >
-      {metricConfig ? (
+      {metricConfig && rows.length > 0 ? (
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={rows} margin={{ top: 8, right: 16, left: 4, bottom: 0 }}>
             <CartesianGrid stroke="var(--gridline)" vertical={false} />
@@ -197,7 +225,7 @@ export function RegiaoSummaryChart({
         </ResponsiveContainer>
       ) : (
         <div className="state-message">
-          Configure os campos da visão Pessoas para exibir este gráfico.
+          Não há dados para os filtros selecionados.
         </div>
       )}
     </ChartCard>

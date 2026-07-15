@@ -40,36 +40,43 @@ const PERSPECTIVA_LABEL = {
 };
 
 /**
+ * Prefixo do campo de cada visão.
+ *
+ * VL_  -> volume financeiro
+ * QT_  -> quantidade de transações
+ * QT_PES_ -> quantidade de pessoas distintas no mês
+ */
+const VISAO_PREFIXO = {
+  valor: "VL_",
+  transacoes: "QT_",
+  pessoas: "QT_PES_",
+};
+
+/**
  * Retorna os campos usados em cada visão.
  *
- * A visão Pessoas depende dos nomes reais das colunas da base.
- * Enquanto esses campos não forem confirmados, ela retorna um array vazio
- * para evitar apresentar transações como se fossem usuários únicos.
+ * QT_PES_* conta pessoas distintas dentro de um mês. Como o BCB aloca cada
+ * pessoa ao município do seu domicílio bancário, ela aparece em um único
+ * município por mês — os campos são somáveis entre municípios, estados e
+ * regiões, e PF + PJ são cadastros distintos. O que nunca vale é somar entre
+ * meses: a mesma pessoa reaparece mês a mês. Por isso a visão Pessoas trabalha
+ * sempre com um mês de referência.
  */
 function getMetricFields(visao, perspectiva, segmento) {
-  if (visao === "valor") {
-    if (segmento === "Todos") {
-      return [
-        `VL_${perspectiva}PF`,
-        `VL_${perspectiva}PJ`,
-      ];
-    }
+  const prefixo = VISAO_PREFIXO[visao];
 
-    return [`VL_${perspectiva}${segmento}`];
+  if (!prefixo) {
+    return [];
   }
 
-  if (visao === "transacoes") {
-    if (segmento === "Todos") {
-      return [
-        `QT_${perspectiva}PF`,
-        `QT_${perspectiva}PJ`,
-      ];
-    }
-
-    return [`QT_${perspectiva}${segmento}`];
+  if (segmento === "Todos") {
+    return [
+      `${prefixo}${perspectiva}PF`,
+      `${prefixo}${perspectiva}PJ`,
+    ];
   }
 
-  return [];
+  return [`${prefixo}${perspectiva}${segmento}`];
 }
 
 /**
@@ -96,6 +103,20 @@ function normalizeMonth(value) {
   return Number.isNaN(numericValue)
     ? null
     : numericValue;
+}
+
+/**
+ * AAAAMM -> MM/AAAA.
+ */
+function formatMesReferencia(anoMes) {
+  if (!anoMes) {
+    return "";
+  }
+
+  const ano = Math.floor(anoMes / 100);
+  const mes = String(anoMes % 100).padStart(2, "0");
+
+  return `${mes}/${ano}`;
 }
 
 export function TransacoesMunicipioPage({ municipio }) {
@@ -290,6 +311,10 @@ export function TransacoesMunicipioPage({ municipio }) {
   /**
    * Calcula os cards usando exatamente os mesmos filtros
    * aplicados aos gráficos.
+   *
+   * Valor e Transações acumulam no período. Pessoas é agregado por mês
+   * (somando as geografias dentro do recorte) e nunca entre meses — daí
+   * pessoasPorMes, de onde saem o mês de referência e a média mensal.
    */
   const totals = useMemo(() => {
     const valorFields = getMetricFields(
@@ -304,10 +329,18 @@ export function TransacoesMunicipioPage({ municipio }) {
       filtros.segmento
     );
 
-    const byMonth = new Set();
+    const pessoasFields = getMetricFields(
+      "pessoas",
+      filtros.perspectiva,
+      filtros.segmento
+    );
+
+    const pessoasPorMesMap = new Map();
 
     const result = dadosFiltrados.reduce(
       (accumulator, row) => {
+        const anoMes = Number(row.AnoMes);
+
         accumulator.valor += sumFields(
           row,
           valorFields
@@ -318,7 +351,11 @@ export function TransacoesMunicipioPage({ municipio }) {
           transactionFields
         );
 
-        byMonth.add(Number(row.AnoMes));
+        pessoasPorMesMap.set(
+          anoMes,
+          (pessoasPorMesMap.get(anoMes) ?? 0) +
+            sumFields(row, pessoasFields)
+        );
 
         return accumulator;
       },
@@ -328,9 +365,33 @@ export function TransacoesMunicipioPage({ municipio }) {
       }
     );
 
+    const pessoasPorMes = [
+      ...pessoasPorMesMap.entries(),
+    ]
+      .map(([anoMes, pessoas]) => ({
+        anoMes,
+        pessoas,
+      }))
+      .sort((a, b) => a.anoMes - b.anoMes);
+
+    const pessoasUltimoMes =
+      pessoasPorMes.length > 0
+        ? pessoasPorMes[pessoasPorMes.length - 1]
+        : null;
+
+    const pessoasMediaMensal =
+      pessoasPorMes.length > 0
+        ? pessoasPorMes.reduce(
+            (total, item) => total + item.pessoas,
+            0
+          ) / pessoasPorMes.length
+        : null;
+
     return {
       ...result,
-      meses: byMonth.size,
+      meses: pessoasPorMes.length,
+      pessoasUltimoMes,
+      pessoasMediaMensal,
     };
   }, [
     dadosFiltrados,
@@ -339,8 +400,22 @@ export function TransacoesMunicipioPage({ municipio }) {
   ]);
 
   /**
+   * Mês de referência da visão Pessoas: o último mês do intervalo filtrado.
+   */
+  const mesReferenciaLabel = useMemo(
+    () =>
+      formatMesReferencia(
+        totals.pessoasUltimoMes?.anoMes
+      ),
+    [totals.pessoasUltimoMes]
+  );
+
+  /**
    * Valor principal exibido no primeiro card,
    * de acordo com a visão selecionada.
+   *
+   * Em Pessoas não existe "total do período": exibimos o último mês do
+   * intervalo, porque somar meses contaria a mesma pessoa várias vezes.
    */
   const totalVisao = useMemo(() => {
     if (filtros.visao === "valor") {
@@ -355,17 +430,37 @@ export function TransacoesMunicipioPage({ municipio }) {
       );
     }
 
+    if (filtros.visao === "pessoas") {
+      return totals.pessoasUltimoMes
+        ? formatNumberCompact(
+            totals.pessoasUltimoMes.pessoas
+          )
+        : "—";
+    }
+
     return "—";
   }, [
     filtros.visao,
     totals.valor,
     totals.transacoes,
+    totals.pessoasUltimoMes,
   ]);
 
   /**
    * Média mensal da métrica selecionada.
+   *
+   * Em Pessoas é a média das contagens mensais — não o total dividido pelos
+   * meses, que exigiria um total que não existe.
    */
   const mediaMensal = useMemo(() => {
+    if (filtros.visao === "pessoas") {
+      return totals.pessoasMediaMensal !== null
+        ? formatNumberCompact(
+            totals.pessoasMediaMensal
+          )
+        : "—";
+    }
+
     if (totals.meses === 0) {
       return "—";
     }
@@ -388,6 +483,7 @@ export function TransacoesMunicipioPage({ municipio }) {
     totals.valor,
     totals.transacoes,
     totals.meses,
+    totals.pessoasMediaMensal,
   ]);
 
   const ticketMedio =
@@ -405,6 +501,19 @@ export function TransacoesMunicipioPage({ municipio }) {
   const visaoLabel =
     VISAO_LABEL[filtros.visao] ??
     "Métrica";
+
+  /**
+   * Rótulo do primeiro card. Em Pessoas ele deixa explícito que o número
+   * é de um mês específico, não do período inteiro.
+   */
+  const totalLabel =
+    filtros.visao === "pessoas"
+      ? `Pessoas — ${perspectivaLabel}${
+          mesReferenciaLabel
+            ? ` em ${mesReferenciaLabel}`
+            : ""
+        }`
+      : `${visaoLabel} ${perspectivaLabel} no período`;
 
   return (
     <>
@@ -521,9 +630,18 @@ export function TransacoesMunicipioPage({ municipio }) {
         </label>
       </Filters>
 
+      {filtros.visao === "pessoas" && (
+        <div className="state-message">
+          Pessoas conta usuários distintos em cada mês, alocados ao município
+          do domicílio bancário. As contagens não se acumulam ao longo do
+          tempo: o card principal e os rankings usam o último mês do intervalo
+          como referência.
+        </div>
+      )}
+
       <section className="kpi-row">
         <StatTile
-          label={`${visaoLabel} ${perspectivaLabel} no período`}
+          label={totalLabel}
           value={totalVisao}
         />
 
@@ -590,16 +708,6 @@ export function TransacoesMunicipioPage({ municipio }) {
           visao={filtros.visao}
         />
       </section>
-
-      {filtros.visao === "pessoas" && (
-        <div className="state-message">
-          A visão Pessoas precisa ser conectada
-          aos campos de usuários únicos disponíveis
-          na base. Os campos QT representam
-          transações e não devem ser utilizados
-          como quantidade de pessoas.
-        </div>
-      )}
     </>
   );
 }

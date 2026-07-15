@@ -100,9 +100,17 @@ async function buildTransacoes() {
   };
 }
 
+
+
 // --- Transações Pix por Município ---
 // Dataset bruto é por município (~5.5k) por mês (~83k linhas). Agregamos por
 // estado para viabilizar mapa/filtro sem enviar granularidade municipal.
+//
+// QT_PES_* (pessoas distintas) é somável entre municípios: o BCB aloca cada
+// pessoa ao município do seu domicílio bancário, então ela aparece em um único
+// município por mês. Como a chave de agregação aqui é AnoMes|Estado, a soma
+// acontece só entre municípios dentro do mesmo mês — operação válida.
+// O que NUNCA pode ser somado é entre meses: a mesma pessoa reaparece mês a mês.
 function buildMunicipio(rows) {
   const map = new Map();
   for (const r of rows) {
@@ -114,21 +122,29 @@ function buildMunicipio(rows) {
       Regiao: r.Regiao,
       VL_PagadorPF: 0,
       QT_PagadorPF: 0,
+      QT_PES_PagadorPF: 0,
       VL_PagadorPJ: 0,
       QT_PagadorPJ: 0,
+      QT_PES_PagadorPJ: 0,
       VL_RecebedorPF: 0,
       QT_RecebedorPF: 0,
+      QT_PES_RecebedorPF: 0,
       VL_RecebedorPJ: 0,
       QT_RecebedorPJ: 0,
+      QT_PES_RecebedorPJ: 0,
     };
     cur.VL_PagadorPF += r.VL_PagadorPF ?? 0;
     cur.QT_PagadorPF += r.QT_PagadorPF ?? 0;
+    cur.QT_PES_PagadorPF += r.QT_PES_PagadorPF ?? 0;
     cur.VL_PagadorPJ += r.VL_PagadorPJ ?? 0;
     cur.QT_PagadorPJ += r.QT_PagadorPJ ?? 0;
+    cur.QT_PES_PagadorPJ += r.QT_PES_PagadorPJ ?? 0;
     cur.VL_RecebedorPF += r.VL_RecebedorPF ?? 0;
     cur.QT_RecebedorPF += r.QT_RecebedorPF ?? 0;
+    cur.QT_PES_RecebedorPF += r.QT_PES_RecebedorPF ?? 0;
     cur.VL_RecebedorPJ += r.VL_RecebedorPJ ?? 0;
     cur.QT_RecebedorPJ += r.QT_RecebedorPJ ?? 0;
+    cur.QT_PES_RecebedorPJ += r.QT_PES_RecebedorPJ ?? 0;
     map.set(key, cur);
   }
 
@@ -143,12 +159,16 @@ function buildMunicipio(rows) {
         Regiao: v.Regiao,
         VL_PagadorPF: round2(v.VL_PagadorPF),
         QT_PagadorPF: v.QT_PagadorPF,
+        QT_PES_PagadorPF: v.QT_PES_PagadorPF,
         VL_PagadorPJ: round2(v.VL_PagadorPJ),
         QT_PagadorPJ: v.QT_PagadorPJ,
+        QT_PES_PagadorPJ: v.QT_PES_PagadorPJ,
         VL_RecebedorPF: round2(v.VL_RecebedorPF),
         QT_RecebedorPF: v.QT_RecebedorPF,
+        QT_PES_RecebedorPF: v.QT_PES_RecebedorPF,
         VL_RecebedorPJ: round2(v.VL_RecebedorPJ),
         QT_RecebedorPJ: v.QT_RecebedorPJ,
+        QT_PES_RecebedorPJ: v.QT_PES_RecebedorPJ,
       };
     })
     .sort((a, b) => a.AnoMes - b.AnoMes || a.Estado.localeCompare(b.Estado));
@@ -156,10 +176,17 @@ function buildMunicipio(rows) {
   return { porEstadoMensal };
 }
 
+
+
 // --- Transações Pix por Município (granularidade municipal) ---
 // Mesmo dataset bruto de buildMunicipio, mas sem descartar Municipio_Ibge:
 // um índice com um registro por município (para nome/UF/região) e, por
 // estado, a série mensal de cada município (para mapas/rankings municipais).
+//
+// A série carrega Pagador E Recebedor, valor, transações e pessoas: a página
+// TransacoesMunicipio monta os nomes dos campos dinamicamente
+// (`${prefixo}${perspectiva}${segmento}`), então qualquer campo omitido aqui
+// vira zero silencioso na tela.
 function buildMunicipiosDetalhado(rows) {
   const indexMap = new Map();
   const porEstadoMap = new Map();
@@ -192,6 +219,12 @@ function buildMunicipiosDetalhado(rows) {
       VL_PagadorPJ: round2(r.VL_PagadorPJ ?? 0),
       QT_PagadorPJ: r.QT_PagadorPJ ?? 0,
       QT_PES_PagadorPJ: r.QT_PES_PagadorPJ ?? 0,
+      VL_RecebedorPF: round2(r.VL_RecebedorPF ?? 0),
+      QT_RecebedorPF: r.QT_RecebedorPF ?? 0,
+      QT_PES_RecebedorPF: r.QT_PES_RecebedorPF ?? 0,
+      VL_RecebedorPJ: round2(r.VL_RecebedorPJ ?? 0),
+      QT_RecebedorPJ: r.QT_RecebedorPJ ?? 0,
+      QT_PES_RecebedorPJ: r.QT_PES_RecebedorPJ ?? 0,
     });
     porEstadoMap.set(r.Estado_Ibge, serie);
   }
@@ -210,10 +243,10 @@ function buildMunicipiosDetalhado(rows) {
 // Recebedor) de todos os candidatos plausíveis a top 10 sob qualquer
 // combinação de filtros (período, perspectiva, visão, segmento). Enviar os
 // ~5.5k municípios seria pesado demais (~70MB); em vez disso, ranqueamos os
-// municípios pelo total histórico de cada métrica (VL/QT × Pagador/Recebedor
-// × PF/PJ/PF+PJ) e mantemos a união dos top N de cada um dos 12 rankings.
-// Na prática, o top 10 de qualquer recorte está contido nesse conjunto
-// (~100–200 municípios, dominado por capitais e grandes cidades).
+// municípios pelo total histórico de cada métrica (VL/QT/QT_PES × Pagador/
+// Recebedor × PF/PJ/PF+PJ) e mantemos a união dos top N de cada um dos 18
+// rankings. Na prática, o top 10 de qualquer recorte está contido nesse
+// conjunto (~100–200 municípios, dominado por capitais e grandes cidades).
 const TOP_MUNICIPIOS_POR_METRICA = 60;
 
 function buildMunicipiosTop(rows) {
@@ -236,44 +269,61 @@ function buildMunicipiosTop(rows) {
       totais: {
         VL_PagadorPF: 0,
         QT_PagadorPF: 0,
+        QT_PES_PagadorPF: 0,
         VL_PagadorPJ: 0,
         QT_PagadorPJ: 0,
+        QT_PES_PagadorPJ: 0,
         VL_RecebedorPF: 0,
         QT_RecebedorPF: 0,
+        QT_PES_RecebedorPF: 0,
         VL_RecebedorPJ: 0,
         QT_RecebedorPJ: 0,
+        QT_PES_RecebedorPJ: 0,
       },
       serie: [],
     };
 
     cur.totais.VL_PagadorPF += r.VL_PagadorPF ?? 0;
     cur.totais.QT_PagadorPF += r.QT_PagadorPF ?? 0;
+    cur.totais.QT_PES_PagadorPF += r.QT_PES_PagadorPF ?? 0;
     cur.totais.VL_PagadorPJ += r.VL_PagadorPJ ?? 0;
     cur.totais.QT_PagadorPJ += r.QT_PagadorPJ ?? 0;
+    cur.totais.QT_PES_PagadorPJ += r.QT_PES_PagadorPJ ?? 0;
     cur.totais.VL_RecebedorPF += r.VL_RecebedorPF ?? 0;
     cur.totais.QT_RecebedorPF += r.QT_RecebedorPF ?? 0;
+    cur.totais.QT_PES_RecebedorPF += r.QT_PES_RecebedorPF ?? 0;
     cur.totais.VL_RecebedorPJ += r.VL_RecebedorPJ ?? 0;
     cur.totais.QT_RecebedorPJ += r.QT_RecebedorPJ ?? 0;
+    cur.totais.QT_PES_RecebedorPJ += r.QT_PES_RecebedorPJ ?? 0;
 
     cur.serie.push({
       AnoMes: r.AnoMes,
       VL_PagadorPF: round2(r.VL_PagadorPF ?? 0),
       QT_PagadorPF: r.QT_PagadorPF ?? 0,
+      QT_PES_PagadorPF: r.QT_PES_PagadorPF ?? 0,
       VL_PagadorPJ: round2(r.VL_PagadorPJ ?? 0),
       QT_PagadorPJ: r.QT_PagadorPJ ?? 0,
+      QT_PES_PagadorPJ: r.QT_PES_PagadorPJ ?? 0,
       VL_RecebedorPF: round2(r.VL_RecebedorPF ?? 0),
       QT_RecebedorPF: r.QT_RecebedorPF ?? 0,
+      QT_PES_RecebedorPF: r.QT_PES_RecebedorPF ?? 0,
       VL_RecebedorPJ: round2(r.VL_RecebedorPJ ?? 0),
       QT_RecebedorPJ: r.QT_RecebedorPJ ?? 0,
+      QT_PES_RecebedorPJ: r.QT_PES_RecebedorPJ ?? 0,
     });
 
     porMunicipio.set(r.Municipio_Ibge, cur);
   }
 
-  // 12 rankings sobre os totais históricos:
-  // {VL, QT} × {Pagador, Recebedor} × {PF, PJ, PF+PJ}.
+  // 18 rankings sobre os totais históricos:
+  // {VL, QT, QT_PES} × {Pagador, Recebedor} × {PF, PJ, PF+PJ}.
+  //
+  // O total histórico de QT_PES não é um número exibível (somar pessoas entre
+  // meses conta a mesma pessoa várias vezes). Aqui ele serve apenas como
+  // proxy de "município consistentemente grande em pessoas", para garantir que
+  // o top 10 por pessoas de qualquer mês esteja entre os candidatos.
   const metricas = [];
-  for (const campo of ["VL", "QT"]) {
+  for (const campo of ["VL", "QT", "QT_PES"]) {
     for (const perspectiva of ["Pagador", "Recebedor"]) {
       metricas.push((t) => t[`${campo}_${perspectiva}PF`]);
       metricas.push((t) => t[`${campo}_${perspectiva}PJ`]);
@@ -304,6 +354,8 @@ function buildMunicipiosTop(rows) {
 
   return { municipios };
 }
+
+
 
 // --- Estoque de Chaves Pix por Participante ---
 // Assim como EstatisticasTransacoesPix e TransacoesPixPorMunicipio, a API

@@ -36,6 +36,19 @@ const VISAO_LABEL = {
   pessoas: "pessoas",
 };
 
+/**
+ * Prefixo do campo de cada visão.
+ *
+ * VL_  -> volume financeiro
+ * QT_  -> quantidade de transações
+ * QT_PES_ -> quantidade de pessoas distintas no mês
+ */
+const VISAO_PREFIXO = {
+  valor: "VL_",
+  transacoes: "QT_",
+  pessoas: "QT_PES_",
+};
+
 function toTitleCase(value = "") {
   return value.replace(/\S+/g, (word) => {
     return word[0] + word.slice(1).toLowerCase();
@@ -43,39 +56,40 @@ function toTitleCase(value = "") {
 }
 
 /**
+ * AAAAMM -> MM/AAAA.
+ */
+function formatMesReferencia(anoMes) {
+  if (!anoMes) {
+    return "";
+  }
+
+  const ano = Math.floor(anoMes / 100);
+  const mes = String(anoMes % 100).padStart(2, "0");
+
+  return `${mes}/${ano}`;
+}
+
+/**
  * Retorna os campos que serão somados de acordo com:
  * - perspectiva: Pagador ou Recebedor
  * - segmento: Todos, PF ou PJ
  * - visão: valor, transações ou pessoas
- *
- * A visão Pessoas ainda não está disponível: os campos QT_PES contam
- * pessoas distintas por mês e não podem ser somados ao longo do período,
- * então retornamos vazio até definirmos uma agregação correta.
  */
 function getMetricFields({ perspectiva, segmento, visao }) {
-  if (visao === "valor") {
-    if (segmento === "Todos") {
-      return [
-        `VL_${perspectiva}PF`,
-        `VL_${perspectiva}PJ`,
-      ];
-    }
+  const prefixo = VISAO_PREFIXO[visao];
 
-    return [`VL_${perspectiva}${segmento}`];
+  if (!prefixo) {
+    return [];
   }
 
-  if (visao === "transacoes") {
-    if (segmento === "Todos") {
-      return [
-        `QT_${perspectiva}PF`,
-        `QT_${perspectiva}PJ`,
-      ];
-    }
-
-    return [`QT_${perspectiva}${segmento}`];
+  if (segmento === "Todos") {
+    return [
+      `${prefixo}${perspectiva}PF`,
+      `${prefixo}${perspectiva}PJ`,
+    ];
   }
 
-  return [];
+  return [`${prefixo}${perspectiva}${segmento}`];
 }
 
 function getMetricConfig(visao) {
@@ -123,6 +137,7 @@ function downloadCsv({
   visao,
   start,
   end,
+  mesReferencia,
 }) {
   if (!rows.length) return;
 
@@ -159,9 +174,18 @@ function downloadCsv({
   const perspectivaSlug =
     perspectiva.toLowerCase();
 
+  /*
+   * Em Pessoas o recorte é um único mês, não um intervalo:
+   * o nome do arquivo precisa refletir o que foi realmente calculado.
+   */
+  const periodoSlug =
+    visao === "pessoas"
+      ? `${mesReferencia}`
+      : `${start}-${end}`;
+
   link.href = url;
   link.download =
-    `pix-top-municipios-${visao}-${perspectivaSlug}-${start}-${end}.csv`;
+    `pix-top-municipios-${visao}-${perspectivaSlug}-${periodoSlug}.csv`;
 
   document.body.appendChild(link);
   link.click();
@@ -239,11 +263,43 @@ export function MunicipioRanking({
     [perspectiva, segmento, visao]
   );
 
+  /**
+   * Mês de referência da visão Pessoas: o último mês com dados dentro do
+   * intervalo filtrado.
+   *
+   * QT_PES_* conta pessoas distintas em um mês; somar meses contaria a mesma
+   * pessoa várias vezes. Por isso o ranking de Pessoas é um retrato de um mês
+   * — o início do intervalo não o afeta.
+   */
+  const mesReferencia = useMemo(() => {
+    if (
+      visao !== "pessoas" ||
+      dataset.status !== "ready"
+    ) {
+      return null;
+    }
+
+    let maior = null;
+
+    for (const municipio of dataset.municipios) {
+      for (const mes of municipio.serie ?? []) {
+        const anoMes = Number(mes.AnoMes);
+
+        if (
+          Number.isFinite(anoMes) &&
+          anoMes >= start &&
+          anoMes <= end &&
+          (maior === null || anoMes > maior)
+        ) {
+          maior = anoMes;
+        }
+      }
+    }
+
+    return maior;
+  }, [dataset, start, end, visao]);
+
   const rows = useMemo(() => {
-    /*
-     * Evita mostrar valores incorretos na visão Pessoas
-     * enquanto os campos específicos não forem configurados.
-     */
     if (
       !metricFields.length ||
       dataset.status !== "ready"
@@ -251,11 +307,23 @@ export function MunicipioRanking({
       return [];
     }
 
+    if (visao === "pessoas" && mesReferencia === null) {
+      return [];
+    }
+
     return dataset.municipios
       .map((municipio) => {
+        /*
+         * Valor e Transações acumulam o intervalo inteiro.
+         * Pessoas usa somente o mês de referência.
+         */
         const valor = (municipio.serie ?? [])
           .filter((mes) => {
             const anoMes = Number(mes.AnoMes);
+
+            if (visao === "pessoas") {
+              return anoMes === mesReferencia;
+            }
 
             return (
               anoMes >= start &&
@@ -290,6 +358,8 @@ export function MunicipioRanking({
     metricFields,
     start,
     end,
+    visao,
+    mesReferencia,
   ]);
 
   const perspectiveText =
@@ -298,13 +368,17 @@ export function MunicipioRanking({
   const metricText =
     VISAO_LABEL[visao];
 
+  const mesReferenciaLabel =
+    formatMesReferencia(mesReferencia);
+
   const title =
     `Top ${TOP_N} municípios por ${metricText} ${perspectiveText}`;
 
   const subtitle =
-    visao === "pessoas" &&
-    !metricFields.length
-      ? "Os campos de pessoas ainda precisam ser configurados de acordo com a estrutura da base."
+    visao === "pessoas"
+      ? `${SEGMENTO_LABEL[segmento]}, perspectiva ${perspectiva.toLowerCase()}. Pessoas distintas em ${
+          mesReferenciaLabel || "—"
+        }, último mês do intervalo — contagens mensais não se somam ao longo do período. Brasil inteiro — não é afetado pelos filtros de região, estado e município.`
       : `${SEGMENTO_LABEL[segmento]}, perspectiva ${perspectiva.toLowerCase()}, no período filtrado. Brasil inteiro — não é afetado pelos filtros de região, estado e município.`;
 
   const actions = (
@@ -319,6 +393,7 @@ export function MunicipioRanking({
           visao,
           start,
           end,
+          mesReferencia,
         })
       }
     >
@@ -349,9 +424,7 @@ export function MunicipioRanking({
   } else if (rows.length === 0) {
     content = (
       <div className="state-message">
-        {visao === "pessoas"
-          ? "Configure os campos da visão Pessoas para exibir este gráfico."
-          : "Não há dados para os filtros selecionados."}
+        Não há dados para os filtros selecionados.
       </div>
     );
   } else {
