@@ -3,6 +3,7 @@ import { Filters } from "../components/shared/Filters";
 import { StatTile } from "../components/shared/StatTile";
 import { TrendChart } from "../components/charts/transacoes/TrendChart";
 import { CategoryBreakdown } from "../components/charts/transacoes/CategoryBreakdown";
+import { NaturezaMatrix } from "../components/charts/transacoes/NaturezaMatrix";
 import { formatAnoMes, formatCurrencyCompact, formatCurrencyFull, formatNumberCompact } from "../lib/format";
 
 function pctDelta(current, previous) {
@@ -48,6 +49,15 @@ export function EstatisticasTransacoesPage({ transacoes }) {
       <section className="charts-grid">
         <TrendChart mensal={mensal} start={range.start} end={range.end} />
         <CategoryBreakdown transacoes={transacoes} start={range.start} end={range.end} />
+      </section>
+
+      {/*
+        Matriz pagador x recebedor. Sempre o último mês fechado da base —
+        não recebe start/end de propósito: cruzar as duas pontas só faz
+        sentido em um recorte temporal único.
+      */}
+      <section className="charts-grid">
+        <NaturezaMatrix porNatureza={transacoes.porNatureza} />
       </section>
     </>
   );
