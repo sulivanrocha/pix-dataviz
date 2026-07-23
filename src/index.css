@@ -224,8 +224,8 @@ input:focus {
 .filters-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 10px;
+  align-items: flex-end;
+  gap: 10px 14px;
   padding: 10px 12px;
   margin-bottom: 16px;
   background: var(--surface-1);
@@ -245,18 +245,42 @@ input:focus {
 .filters-hint {
   margin-left: auto;
   align-self: flex-end;
+  padding-bottom: 6px;
   font-size: 12px;
   color: var(--text-muted);
 }
 
 /*
- * Grupo vertical De/Até: os dois seletores de mês ficam
- * empilhados para deixar claro que formam um intervalo.
+ * Grupo De/Ate. Dois layouts, escolhidos via prop `layout`
+ * no componente Filters:
+ *   - .is-row   (padrao) lado a lado, para barras de filtro
+ *                de pagina inteira, onde ha largura sobrando.
+ *   - .is-stack empilhado, para filtros dentro de um chart-card
+ *                estreito ao lado do botao de CSV.
+ * Abaixo de 560px o layout empilha sempre, independente da prop.
  */
 .filters-period {
   display: flex;
+  align-items: flex-end;
+}
+
+.filters-period.is-row {
+  flex-direction: row;
+  gap: 14px;
+}
+
+.filters-period.is-stack {
   flex-direction: column;
+  align-items: stretch;
   gap: 8px;
+}
+
+@media (max-width: 560px) {
+  .filters-period.is-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
 }
 
 /*
@@ -681,13 +705,12 @@ input:focus {
   margin: 0;
 }
 /* --- Municipality analysis section: filters and charts share one block --- */
-.municipio-analysis-block {
-  margin-top: 16px;
-  padding: 14px;
-  background: var(--surface-1);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
+.municipio-analysis-block .filters-row {
+  margin-bottom: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .municipio-analysis-filters {
