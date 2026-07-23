@@ -76,17 +76,39 @@ function CascadingMonthSelect({ label, value, options, onChange }) {
   );
 }
 
-export function Filters({ months, start, end, onStartChange, onEndChange, hint, children }) {
+/**
+ * Barra de filtros de periodo.
+ *
+ * `layout` controla como os seletores De/Ate se organizam:
+ *   - "row"   (padrao) lado a lado. Melhor em barras de filtro
+ *             de pagina inteira, onde sobra largura horizontal.
+ *   - "stack" empilhado. Melhor dentro de um chart-card estreito
+ *             ou ao lado de outro grupo vertical, como o
+ *             MunicipioSelector.
+ *
+ * Abaixo de 560px o CSS empilha sempre, independente da prop.
+ */
+export function Filters({
+  months,
+  start,
+  end,
+  onStartChange,
+  onEndChange,
+  hint,
+  layout = "row",
+  children,
+}) {
   const startOptions = months.filter((m) => m <= end);
   const endOptions = months.filter((m) => m >= start);
 
+  const periodClass =
+    layout === "stack"
+      ? "filters-period is-stack"
+      : "filters-period is-row";
+
   return (
     <div className="filters-row">
-      {/*
-        De e Até ficam empilhados verticalmente para
-        reforçar que formam um único intervalo de período.
-      */}
-      <div className="filters-period">
+      <div className={periodClass}>
         <CascadingMonthSelect
           label="De"
           value={start}

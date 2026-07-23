@@ -517,10 +517,14 @@ export function TransacoesMunicipioPage({ municipio }) {
 
   return (
     <>
-      <Filters
+
+
+
+    <Filters
         months={months}
         start={range.start}
         end={range.end}
+        layout="stack"
         onStartChange={(value) =>
           setFiltros((current) => ({
             ...current,
