@@ -11,12 +11,14 @@ import {
   formatNumberCompact,
   formatNumberFull,
 } from "../../../lib/format";
-import { categoryLabel, categoryColor, sortByDimensionOrder } from "../../../lib/categories";
+import { categoryLabel, categoryColor } from "../../../lib/categories";
 
 const METRIC_FORMAT = {
   VALOR: { compact: formatCurrencyCompact, full: formatCurrencyFull, label: "valor transacionado" },
   QUANTIDADE: { compact: formatNumberCompact, full: formatNumberFull, label: "transações liquidadas" },
 };
+
+const SHARE_TICKS = [0, 25, 50, 75, 100];
 
 function formatPercent(value) {
   return `${Number(value).toLocaleString("pt-BR", {
@@ -25,19 +27,16 @@ function formatPercent(value) {
   })}%`;
 }
 
-/**
- * Bloco de composição por categoria.
- *
- * Um único componente, montado duas vezes pela página:
- *   - mode="absolute" -> barras empilhadas com o valor bruto da métrica.
- *     Responde "qual o tamanho de cada categoria".
- *   - mode="share"    -> cada mês normalizado a 100%. Todas as barras têm a
- *     mesma altura e só as proporções se movem. Responde "como a composição
- *     muda no tempo" — o deslocamento de participação que a visão absoluta
- *     esconde quando o total cresce mês a mês.
- *
- * Dimensão e métrica vêm por prop; cor, rótulo e ordem reaproveitam categories.js.
+/*
+ * Categorias "Nao disponivel"/"Nao informado" seguem a convencao do
+ * categories.js (prefixo "Nao") e sao suprimidas do grafico: nao ocupam
+ * fatia da pilha nem entram no total do modo composicao, para que as barras
+ * de % somem exatamente 100 entre as categorias reais.
  */
+function isMuted(categoria) {
+  return String(categoria).startsWith("Nao");
+}
+
 export function CategoryBreakdown({
   transacoes,
   start,
@@ -51,10 +50,31 @@ export function CategoryBreakdown({
 
   const { rows, categorias } = useMemo(() => {
     const dimData = transacoes[dimensionKey] ?? [];
-    const filtered = dimData.filter((r) => r.AnoMes >= start && r.AnoMes <= end);
-    const categorias = sortByDimensionOrder(
-      dimensionKey,
-      [...new Set(filtered.map((r) => r.categoria))]
+
+    /*
+     * Ordem da pilha: maior embaixo, decrescente para cima. O ranking usa o
+     * ultimo mes disponivel na base (independente do filtro De/Ate) e a metrica
+     * em exibicao — assim a ordem e estavel ao longo de todos os meses do grafico
+     * e igual nos dois cards (absoluto e composicao).
+     */
+    const refMonth = dimData.reduce(
+      (max, r) => (r.AnoMes > max ? r.AnoMes : max),
+      -Infinity
+    );
+
+    const refTotals = new Map();
+    for (const r of dimData) {
+      if (r.AnoMes === refMonth && !isMuted(r.categoria)) {
+        refTotals.set(r.categoria, (refTotals.get(r.categoria) ?? 0) + (Number(r[metric]) || 0));
+      }
+    }
+
+    const filtered = dimData.filter(
+      (r) => r.AnoMes >= start && r.AnoMes <= end && !isMuted(r.categoria)
+    );
+
+    const categorias = [...new Set(filtered.map((r) => r.categoria))].sort(
+      (a, b) => (refTotals.get(b) ?? 0) - (refTotals.get(a) ?? 0)
     );
 
     const byMonth = new Map();
@@ -66,11 +86,6 @@ export function CategoryBreakdown({
 
     let ordered = [...byMonth.values()].sort((a, b) => a.AnoMes - b.AnoMes);
 
-    /*
-     * No modo composição, cada categoria vira sua participação (%) no total
-     * daquele mês. Todas as barras passam a somar 100 e a leitura deixa de
-     * ser tamanho e passa a ser proporção.
-     */
     if (isShare) {
       ordered = ordered.map((row) => {
         const total = categorias.reduce((sum, cat) => sum + (Number(row[cat]) || 0), 0);
@@ -88,7 +103,10 @@ export function CategoryBreakdown({
     return { rows: ordered, categorias };
   }, [transacoes, dimensionKey, metric, start, end, isShare]);
 
-  const yTickFormatter = isShare ? (v) => `${v}%` : metricCfg.compact;
+  const yTickFormatter = isShare
+    ? (v) => `${Math.round(v)}%`
+    : metricCfg.compact;
+
   const tooltipFormat = isShare ? formatPercent : metricCfg.full;
 
   const title = isShare ? "Composição por categoria (%)" : "Valor por categoria";
@@ -114,6 +132,8 @@ export function CategoryBreakdown({
             tickLine={false}
             width={56}
             domain={isShare ? [0, 100] : undefined}
+            ticks={isShare ? SHARE_TICKS : undefined}
+            allowDataOverflow={isShare}
             tickFormatter={yTickFormatter}
           />
           <Tooltip

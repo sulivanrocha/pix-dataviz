@@ -12,6 +12,18 @@
   --border: #e3e8e6;
   --rule: #edf1f0;
 
+  /* Natureza (X2Y): pagador = matiz, recebedor = tom (claro -> escuro). */
+  --nat-p-1: #7fb3f2;   /* Pessoa paga -> azul  */
+  --nat-p-2: #3d8be0;
+  --nat-p-3: #1f5fa8;
+  --nat-b-1: #6fccae;   /* Empresa paga -> verde/teal */
+  --nat-b-2: #2ba382;
+  --nat-b-3: #197a5f;
+  --nat-g-1: #f2c368;   /* Governo paga -> ambar */
+  --nat-g-2: #dd9b1f;
+  --nat-g-3: #a86f12;
+
+
   --accent: #319274;             /* Pix-inspired teal — primary accent */
   --accent-bg: rgba(49, 146, 116, 0.08);
   --accent-secondary: #b0325a;   /* muted claret — reserved for small flourishes */
@@ -32,6 +44,17 @@
   --series-6: #e34948;
   --series-7: #e87ba4;
   --series-8: #eb6834;
+
+  /* Natureza: tons um pouco mais claros/saturados para o fundo escuro. */
+    --nat-p-1: #9cc4f5;
+    --nat-p-2: #4f97e8;
+    --nat-p-3: #2e72c4;
+    --nat-b-1: #85d6bd;
+    --nat-b-2: #34b391;
+    --nat-b-3: #1f8f70;
+    --nat-g-1: #f5cf82;
+    --nat-g-2: #e5a92f;
+    --nat-g-3: #c08420;
 
   --seq-100: #cde2fb;
   --seq-300: #6da7ec;
@@ -981,4 +1004,10 @@ input:focus {
   .natureza-matrix-share {
     font-size: 10px;
   }
+
+
+
+
 }
+
+
