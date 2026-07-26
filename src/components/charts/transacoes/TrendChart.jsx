@@ -1,60 +1,71 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { ChartCard } from "../../shared/ChartCard";
 import { ChartTooltip } from "../../shared/ChartTooltip";
-import { formatAnoMes, formatCurrencyCompact, formatNumberCompact, formatCurrencyFull, formatNumberFull } from "../../../lib/format";
+import {
+  formatAnoMes,
+  formatCurrencyCompact,
+  formatCurrencyFull,
+  formatNumberCompact,
+  formatNumberFull,
+} from "../../../lib/format";
 
+/**
+ * Configuração por métrica.
+ *
+ * A métrica (Valor x Transações) vem da página como prop — é o mesmo controle
+ * que rege todos os gráficos da página. O card não escolhe mais sozinho.
+ */
 const METRICS = {
-  VALOR: { label: "Valor (R$)", seriesName: "Valor transacionado", compact: formatCurrencyCompact, full: formatCurrencyFull },
-  QUANTIDADE: { label: "Quantidade", seriesName: "Transações", compact: formatNumberCompact, full: formatNumberFull },
+  VALOR: {
+    seriesName: "Valor transacionado",
+    subtitle: "Valor mensal liquidado no SPI, todo o Brasil",
+    compact: formatCurrencyCompact,
+    full: formatCurrencyFull,
+  },
+  QUANTIDADE: {
+    seriesName: "Transações",
+    subtitle: "Quantidade mensal liquidada no SPI, todo o Brasil",
+    compact: formatNumberCompact,
+    full: formatNumberFull,
+  },
 };
 
-export function TrendChart({ mensal, start, end }) {
-  const [metric, setMetric] = useState("VALOR");
-  const cfg = METRICS[metric];
+/**
+ * Transações Pix liquidadas por mês.
+ *
+ * Uma coluna por mês (antes era uma área contínua). A leitura passa a ser de
+ * blocos mês a mês, o que casa com os demais gráficos de barra da página.
+ */
+export function TrendChart({ mensal, start, end, metric = "VALOR" }) {
+  const cfg = METRICS[metric] ?? METRICS.VALOR;
 
   const rows = useMemo(
     () =>
       mensal
         .filter((r) => r.AnoMes >= start && r.AnoMes <= end)
+        .sort((a, b) => a.AnoMes - b.AnoMes)
         .map((r) => ({ mes: formatAnoMes(r.AnoMes), valor: r[metric] })),
     [mensal, start, end, metric]
-  );
-
-  const tabs = (
-    <div className="chart-tabs">
-      {Object.entries(METRICS).map(([key, m]) => (
-        <button
-          key={key}
-          type="button"
-          className={key === metric ? "active" : ""}
-          onClick={() => setMetric(key)}
-        >
-          {m.label}
-        </button>
-      ))}
-    </div>
   );
 
   return (
     <ChartCard
       title="Transações Pix liquidadas por mês"
-      subtitle="Volume mensal no SPI, todo o Brasil"
+      subtitle={cfg.subtitle}
       fullWidth
-      tabs={tabs}
     >
       <ResponsiveContainer width="100%" height={280}>
-        <AreaChart data={rows} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
-          <defs>
-            <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--series-1)" stopOpacity={0.35} />
-              <stop offset="100%" stopColor="var(--series-1)" stopOpacity={0.02} />
-            </linearGradient>
-          </defs>
+        <BarChart data={rows} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
           <CartesianGrid stroke="var(--gridline)" vertical={false} />
-          <XAxis dataKey="mes" tick={{ fontSize: 11, fill: "var(--text-muted)" }} axisLine={{ stroke: "var(--baseline)" }} tickLine={false} />
+          <XAxis
+            dataKey="mes"
+            tick={{ fontSize: 11, fill: "var(--text-muted)" }}
+            axisLine={{ stroke: "var(--baseline)" }}
+            tickLine={false}
+          />
           <YAxis
             tick={{ fontSize: 11, fill: "var(--text-muted)" }}
             axisLine={false}
@@ -63,20 +74,16 @@ export function TrendChart({ mensal, start, end }) {
             tickFormatter={cfg.compact}
           />
           <Tooltip
-            cursor={{ stroke: "var(--baseline)", strokeWidth: 1 }}
+            cursor={{ fill: "var(--gridline)", opacity: 0.4 }}
             content={<ChartTooltip formatValue={cfg.full} />}
           />
-          <Area
-            type="monotone"
+          <Bar
             dataKey="valor"
             name={cfg.seriesName}
-            stroke="var(--series-1)"
-            strokeWidth={2}
-            fill="url(#trendFill)"
-            dot={false}
-            activeDot={{ r: 4 }}
+            fill="var(--series-1)"
+            radius={0}
           />
-        </AreaChart>
+        </BarChart>
       </ResponsiveContainer>
     </ChartCard>
   );

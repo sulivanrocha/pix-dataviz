@@ -766,6 +766,91 @@ input:focus {
   gap: 12px;
 }
 
+
+/* Linha do tempo da matriz: play + slider + rotulo do mes. */
+.matrix-timeline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.matrix-play {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+  color: #ffffff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.matrix-play:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.matrix-slider {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 4px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--baseline);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.matrix-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  background: var(--accent);
+  border: 2px solid var(--surface-1);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+
+.matrix-slider::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  background: var(--accent);
+  border: 2px solid var(--surface-1);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+
+.matrix-timeline-label {
+  flex: 0 0 auto;
+  min-width: 92px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.matrix-timeline-range {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  /* Alinha as pontas com a faixa do slider, descontando play e rotulo. */
+  padding: 0 102px 0 40px;
+  margin-top: -6px;
+}
+
+
 .natureza-matrix-table {
   width: 100%;
   border-collapse: separate;

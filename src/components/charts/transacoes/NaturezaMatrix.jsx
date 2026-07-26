@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChartCard } from "../../shared/ChartCard";
 import {
   formatAnoMes,
@@ -28,11 +28,10 @@ const METRICAS = [
   { value: "ticket", label: "Ticket médio" },
 ];
 
-const METRICA_LABEL = {
-  valor: "valor transacionado",
-  quantidade: "transações liquidadas",
-  ticket: "ticket médio",
-};
+/**
+ * Intervalo entre quadros na reprodução automática (ms).
+ */
+const PLAY_INTERVAL_MS = 1100;
 
 /**
  * Escala logarítmica de intensidade.
@@ -78,19 +77,67 @@ export function NaturezaMatrix({ porNatureza = [] }) {
   const [metrica, setMetrica] = useState("valor");
 
   /**
-   * Último mês disponível na dimensão NATUREZA.
+   * Meses disponíveis na dimensão NATUREZA, ordenados.
    *
-   * A matriz é sempre um retrato de um mês: os filtros de período da página
-   * não a afetam de propósito. Cruzar pagador x recebedor só faz sentido em
-   * um recorte temporal único.
+   * A matriz é sempre um retrato de UM mês — cruzar pagador x recebedor só faz
+   * sentido num recorte temporal único. O slider percorre esta lista; o botão
+   * de play a anima. Os filtros de período da página continuam sem efeito aqui,
+   * de propósito.
    */
-  const mesReferencia = useMemo(() => {
-    const meses = porNatureza
-      .map((row) => Number(row.AnoMes))
-      .filter((anoMes) => Number.isFinite(anoMes));
-
-    return meses.length > 0 ? Math.max(...meses) : null;
+  const meses = useMemo(() => {
+    return [
+      ...new Set(
+        porNatureza
+          .map((row) => Number(row.AnoMes))
+          .filter((anoMes) => Number.isFinite(anoMes))
+      ),
+    ].sort((a, b) => a - b);
   }, [porNatureza]);
+
+  /**
+   * Índice do mês em exibição. Começa no último mês fechado (comportamento
+   * anterior) e é controlado pelo slider / play.
+   */
+  const [mesIndex, setMesIndex] = useState(0);
+  const [tocando, setTocando] = useState(false);
+
+  /*
+   * Sempre que a lista de meses mudar (nova carga de dados), reposiciona no
+   * último mês e para a reprodução — evita índice fora de faixa.
+   */
+  useEffect(() => {
+    setMesIndex(meses.length > 0 ? meses.length - 1 : 0);
+    setTocando(false);
+  }, [meses.length]);
+
+  /*
+   * Reprodução automática: avança um mês por vez e volta ao início ao fim.
+   */
+  const intervalRef = useRef(null);
+
+  useEffect(() => {
+    if (!tocando || meses.length <= 1) {
+      return undefined;
+    }
+
+    intervalRef.current = setInterval(() => {
+      setMesIndex((current) => (current + 1) % meses.length);
+    }, PLAY_INTERVAL_MS);
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [tocando, meses.length]);
+
+  const indiceSeguro =
+    meses.length === 0
+      ? 0
+      : Math.min(Math.max(mesIndex, 0), meses.length - 1);
+
+  const mesReferencia = meses.length > 0 ? meses[indiceSeguro] : null;
 
   /**
    * Reagrupa as linhas do mês em uma matriz 3x3.
@@ -229,16 +276,56 @@ export function NaturezaMatrix({ porNatureza = [] }) {
       ? (foraDoGrid.valor / (totais.valor + foraDoGrid.valor)) * 100
       : 0;
 
+  const primeiroMes = meses[0];
+  const ultimoMes = meses[meses.length - 1];
+
   return (
     <ChartCard
       title="Fluxo entre Pessoas, Empresas e Governo"
       subtitle={`Quem paga (linhas) e quem recebe (colunas) em ${formatAnoMes(
         mesReferencia
-      )}, o último mês fechado da base. Sempre um único mês — os filtros de período da página não afetam esta matriz.`}
+      )}. Arraste o controle ou use o play para percorrer os meses. Sempre um único mês — os filtros de período da página não afetam esta matriz.`}
       tabs={metricaSelector}
       fullWidth
     >
       <div className="natureza-matrix">
+        <div className="matrix-timeline">
+          <button
+            type="button"
+            className="matrix-play"
+            onClick={() => setTocando((current) => !current)}
+            aria-label={tocando ? "Pausar" : "Reproduzir"}
+            disabled={meses.length <= 1}
+          >
+            {tocando ? "❚❚" : "►"}
+          </button>
+
+          <input
+            type="range"
+            className="matrix-slider"
+            min={0}
+            max={Math.max(meses.length - 1, 0)}
+            value={indiceSeguro}
+            onChange={(event) => {
+              // Arrastar manualmente interrompe a reprodução.
+              setTocando(false);
+              setMesIndex(Number(event.target.value));
+            }}
+            aria-label="Mês de referência"
+          />
+
+          <span className="matrix-timeline-label">
+            {formatAnoMes(mesReferencia)}
+          </span>
+        </div>
+
+        {meses.length > 1 && (
+          <div className="matrix-timeline-range">
+            <span>{formatAnoMes(primeiroMes)}</span>
+            <span>{formatAnoMes(ultimoMes)}</span>
+          </div>
+        )}
+
         <table className="natureza-matrix-table">
           <thead>
             <tr>
