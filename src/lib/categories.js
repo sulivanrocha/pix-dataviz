@@ -17,42 +17,8 @@ const SERIES = [
 function buildPalette(order) {
   const map = {};
   let i = 0;
-  for (const dim of Object.values(DIMENSIONS)) {
-    dim.colors = buildPalette(dim.order);
-  }
-
-  /*
-  * Natureza tem estrutura de familia (X2Y): a cor codifica o pagador (primeira
-  * letra) numa mesma matiz e o recebedor (segunda letra) em tres tons. Assim,
-  * tudo que "Pessoa paga" fica azul, "Empresa paga" verde, "Governo paga" ambar
-  * — e dentro de cada familia P->B->G vai do claro ao escuro. As variaveis
-  * --nat-* sao definidas em index.css, com variante para tema escuro.
-  * "Nao disponivel" continua cinza e some do grafico (filtrado na exibicao).
-  */
-  DIMENSIONS.porNatureza.colors = {
-    P2P: "var(--nat-p-1)",
-    P2B: "var(--nat-p-2)",
-    P2G: "var(--nat-p-3)",
-    B2P: "var(--nat-b-1)",
-    B2B: "var(--nat-b-2)",
-    B2G: "var(--nat-b-3)",
-    G2P: "var(--nat-g-1)",
-    G2B: "var(--nat-g-2)",
-    G2G: "var(--nat-g-3)",
-    "Nao disponivel": MUTED,
-  };
-
-  export function categoryLabel(dimensionKey, categoria) {
-    return DIMENSIONS[dimensionKey]?.labels[categoria] ?? categoria;
-  }
-
-  export function categoryColor(dimensionKey, categoria) {
-    return DIMENSIONS[dimensionKey]?.colors[categoria] ?? MUTED;
-  }
-
-  export function sortByDimensionOrder(dimensionKey, categorias) {
-    const order = DIMENSIONS[dimensionKey]?.order ?? [];
-    return [...categorias].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  for (const key of order) {
+    map[key] = key.startsWith("Nao") ? MUTED : SERIES[i++];
   }
   return map;
 }
@@ -121,6 +87,27 @@ export const DIMENSIONS = {
 for (const dim of Object.values(DIMENSIONS)) {
   dim.colors = buildPalette(dim.order);
 }
+
+/*
+ * Natureza tem estrutura de familia (X2Y): a cor codifica o pagador (primeira
+ * letra) numa mesma matiz e o recebedor (segunda letra) em tres tons. Assim,
+ * tudo que "Pessoa paga" fica azul, "Empresa paga" verde, "Governo paga" ambar
+ * — e dentro de cada familia P->B->G vai do claro ao escuro. As variaveis
+ * --nat-* sao definidas em index.css, com variante para tema escuro.
+ * "Nao disponivel" continua cinza e some do grafico (filtrado na exibicao).
+ */
+DIMENSIONS.porNatureza.colors = {
+  P2P: "var(--nat-p-1)",
+  P2B: "var(--nat-p-2)",
+  P2G: "var(--nat-p-3)",
+  B2P: "var(--nat-b-1)",
+  B2B: "var(--nat-b-2)",
+  B2G: "var(--nat-b-3)",
+  G2P: "var(--nat-g-1)",
+  G2B: "var(--nat-g-2)",
+  G2G: "var(--nat-g-3)",
+  "Nao disponivel": MUTED,
+};
 
 export function categoryLabel(dimensionKey, categoria) {
   return DIMENSIONS[dimensionKey]?.labels[categoria] ?? categoria;
