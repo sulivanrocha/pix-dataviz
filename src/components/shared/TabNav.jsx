@@ -6,8 +6,11 @@
 import { NavLink } from "react-router-dom";
 import { TABS } from "../../lib/tabs";
 import { trackTabView } from "../../lib/analytics";
+import { useI18n } from "../../lib/i18n/I18nContext";
 
 export function TabNav() {
+  const { t } = useI18n();
+
   return (
     <nav className="tab-nav">
       {TABS.map((tab) => (
@@ -18,7 +21,7 @@ export function TabNav() {
           className={({ isActive }) => (isActive ? "active" : "")}
           onClick={() => trackTabView(tab.key)}
         >
-          {tab.label}
+          {t(tab.labelKey)}
         </NavLink>
       ))}
     </nav>

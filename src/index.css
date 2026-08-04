@@ -144,9 +144,25 @@ input:focus {
 }
 
 .app-header {
+  position: relative;
   margin-bottom: 18px;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--border);
+}
+
+.app-header__lang {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+@media (max-width: 560px) {
+  .app-header__lang {
+    position: static;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: flex-end;
+  }
 }
 
 .app-header__title {

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
+import { useI18n } from "../../../lib/i18n/I18nContext";
 import { ChartCard } from "../../shared/ChartCard";
 import { ChartTooltip } from "../../shared/ChartTooltip";
 import {
@@ -20,14 +21,14 @@ import {
  */
 const METRICS = {
   VALOR: {
-    seriesName: "Valor transacionado",
-    subtitle: "Valor mensal liquidado no SPI, todo o Brasil",
+    seriesKey: "transacoesPage.trendSeriesValue",
+    subtitleKey: "transacoesPage.trendSubValue",
     compact: formatCurrencyCompact,
     full: formatCurrencyFull,
   },
   QUANTIDADE: {
-    seriesName: "Transações",
-    subtitle: "Quantidade mensal liquidada no SPI, todo o Brasil",
+    seriesKey: "common.transactions",
+    subtitleKey: "transacoesPage.trendSubCount",
     compact: formatNumberCompact,
     full: formatNumberFull,
   },
@@ -40,6 +41,7 @@ const METRICS = {
  * blocos mês a mês, o que casa com os demais gráficos de barra da página.
  */
 export function TrendChart({ mensal, start, end, metric = "VALOR" }) {
+  const { t } = useI18n();
   const cfg = METRICS[metric] ?? METRICS.VALOR;
 
   const rows = useMemo(
@@ -53,8 +55,8 @@ export function TrendChart({ mensal, start, end, metric = "VALOR" }) {
 
   return (
     <ChartCard
-      title="Transações Pix liquidadas por mês"
-      subtitle={cfg.subtitle}
+      title={t("transacoesPage.trendTitle")}
+      subtitle={t(cfg.subtitleKey)}
       fullWidth
     >
       <ResponsiveContainer width="100%" height={280}>
@@ -79,7 +81,7 @@ export function TrendChart({ mensal, start, end, metric = "VALOR" }) {
           />
           <Bar
             dataKey="valor"
-            name={cfg.seriesName}
+            name={t(cfg.seriesKey)}
             fill="var(--series-1)"
             radius={0}
           />

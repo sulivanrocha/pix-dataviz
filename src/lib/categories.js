@@ -26,11 +26,14 @@ function buildPalette(order) {
 export const DIMENSIONS = {
   porPFPJPagador: {
     label: "Pessoa física x jurídica (pagador)",
+    labelEn: "Individual vs. business (payer)",
     order: ["PF", "PJ", "Nao disponivel"],
     labels: { PF: "Pessoa física", PJ: "Pessoa jurídica", "Nao disponivel": "Não disponível" },
+    labelsEn: { PF: "Individual", PJ: "Business", "Nao disponivel": "Not available" },
   },
   porRegiaoPagador: {
     label: "Região do pagador",
+    labelEn: "Payer region",
     order: ["SUDESTE", "NORDESTE", "SUL", "NORTE", "CENTRO-OESTE", "Nao informado"],
     labels: {
       SUDESTE: "Sudeste",
@@ -40,9 +43,18 @@ export const DIMENSIONS = {
       "CENTRO-OESTE": "Centro-Oeste",
       "Nao informado": "Não informado",
     },
+    labelsEn: {
+      SUDESTE: "Southeast",
+      NORDESTE: "Northeast",
+      SUL: "South",
+      NORTE: "North",
+      "CENTRO-OESTE": "Central-West",
+      "Nao informado": "Not reported",
+    },
   },
   porNatureza: {
     label: "Natureza da transação",
+    labelEn: "Transaction nature",
     order: ["P2P", "P2B", "B2P", "B2B", "P2G", "B2G", "G2P", "G2B", "G2G", "Nao disponivel"],
     labels: {
       P2P: "Pessoa → Pessoa",
@@ -56,9 +68,22 @@ export const DIMENSIONS = {
       G2G: "Governo → Governo",
       "Nao disponivel": "Não disponível",
     },
+    labelsEn: {
+      P2P: "Person → Person",
+      P2B: "Person → Business",
+      B2P: "Business → Person",
+      B2B: "Business → Business",
+      P2G: "Person → Government",
+      B2G: "Business → Government",
+      G2P: "Government → Person",
+      G2B: "Government → Business",
+      G2G: "Government → Government",
+      "Nao disponivel": "Not available",
+    },
   },
   porFinalidade: {
     label: "Finalidade",
+    labelEn: "Purpose",
     order: ["Pix", "Pix Saque", "Pix Troco", "Nao disponivel"],
     labels: {
       Pix: "Transferência",
@@ -66,9 +91,16 @@ export const DIMENSIONS = {
       "Pix Troco": "Troco",
       "Nao disponivel": "Não disponível",
     },
+    labelsEn: {
+      Pix: "Transfer",
+      "Pix Saque": "Withdrawal",
+      "Pix Troco": "Cash back",
+      "Nao disponivel": "Not available",
+    },
   },
   porFormaIniciacao: {
     label: "Forma de iniciação",
+    labelEn: "Initiation method",
     order: ["DICT", "QRES", "QRDN", "MANU", "INIC", "AUTO", "APDN", "APES", "Nao disponivel"],
     labels: {
       DICT: "Chave Pix",
@@ -80,6 +112,17 @@ export const DIMENSIONS = {
       APDN: "Aproximação",
       APES: "Aproximação estática",
       "Nao disponivel": "Não disponível",
+    },
+    labelsEn: {
+      DICT: "Pix key",
+      QRES: "Static QR code",
+      QRDN: "Dynamic QR code",
+      MANU: "Manual entry",
+      INIC: "Payment initiator",
+      AUTO: "Automatic Pix",
+      APDN: "Contactless",
+      APES: "Static contactless",
+      "Nao disponivel": "Not available",
     },
   },
 };
@@ -109,8 +152,17 @@ DIMENSIONS.porNatureza.colors = {
   "Nao disponivel": MUTED,
 };
 
-export function categoryLabel(dimensionKey, categoria) {
-  return DIMENSIONS[dimensionKey]?.labels[categoria] ?? categoria;
+export function categoryLabel(dimensionKey, categoria, lang = "pt") {
+  const dim = DIMENSIONS[dimensionKey];
+  if (!dim) return categoria;
+  const table = lang === "en" ? dim.labelsEn ?? dim.labels : dim.labels;
+  return table[categoria] ?? dim.labels[categoria] ?? categoria;
+}
+
+export function dimensionLabel(dimensionKey, lang = "pt") {
+  const dim = DIMENSIONS[dimensionKey];
+  if (!dim) return dimensionKey;
+  return lang === "en" ? dim.labelEn ?? dim.label : dim.label;
 }
 
 export function categoryColor(dimensionKey, categoria) {

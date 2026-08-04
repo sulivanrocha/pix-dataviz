@@ -1,13 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useI18n } from "../lib/i18n/I18nContext";
 
-const REGIOES = [
-  { value: "Todas", label: "Todas as regiões" },
-  { value: "NORTE", label: "Norte" },
-  { value: "NORDESTE", label: "Nordeste" },
-  { value: "CENTRO-OESTE", label: "Centro-Oeste" },
-  { value: "SUDESTE", label: "Sudeste" },
-  { value: "SUL", label: "Sul" },
-];
+const REGIAO_VALUES = ["Todas", "NORTE", "NORDESTE", "CENTRO-OESTE", "SUDESTE", "SUL"];
 
 // Seletor em cascata Região → Estado → Município. Sempre identifica o
 // município selecionado por Municipio_Ibge (nunca por nome, que pode se
@@ -15,6 +9,11 @@ const REGIOES = [
 // municipal em public/data/municipios/{estadoIbge}.json e repassa via
 // onChange para quem for renderizar os dados (ex.: filtrar por Municipio_Ibge).
 export function MunicipioSelector({ onChange = () => {} }) {
+  const { t } = useI18n();
+  const REGIOES = REGIAO_VALUES.map((value) => ({
+    value,
+    label: value === "Todas" ? t("common.allRegions") : t(`regions.${value}`),
+  }));
   const [index, setIndex] = useState([]);
   const [indexStatus, setIndexStatus] = useState("loading");
 
@@ -136,7 +135,7 @@ export function MunicipioSelector({ onChange = () => {} }) {
   return (
     <div className="municipio-selector">
       <label>
-        Região
+        {t("municipioPage.region")}
         <select
           value={regiao}
           onChange={(e) => handleRegiaoChange(e.target.value)}
@@ -151,13 +150,13 @@ export function MunicipioSelector({ onChange = () => {} }) {
       </label>
 
       <label>
-        Estado
+        {t("municipioPage.state")}
         <select
           value={estadoIbge}
           onChange={(e) => handleEstadoChange(e.target.value)}
         >
           <option value="" disabled>
-            Selecione o estado
+            {t("municipioPage.selectState")}
           </option>
           {estados.map((e) => (
             <option key={e.estadoIbge} value={e.estadoIbge}>
@@ -168,11 +167,11 @@ export function MunicipioSelector({ onChange = () => {} }) {
       </label>
 
       <label className="municipio-combobox">
-        Município
+        {t("common.municipality")}
         <input
           type="text"
           value={query}
-          placeholder="Buscar município..."
+          placeholder={t("common.searchMunicipality")}
           disabled={!estadoIbge}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -203,9 +202,9 @@ export function MunicipioSelector({ onChange = () => {} }) {
         )}
       </label>
 
-      {estadoData.status === "loading" && <span className="filters-hint">Carregando dados do estado...</span>}
-      {estadoData.status === "error" && <span className="filters-hint">Falha ao carregar dados do estado.</span>}
-      {indexStatus === "error" && <span className="filters-hint">Falha ao carregar lista de municípios.</span>}
+      {estadoData.status === "loading" && <span className="filters-hint">{t("municipioPage.loadingState")}</span>}
+      {estadoData.status === "error" && <span className="filters-hint">{t("municipioPage.errorState")}</span>}
+      {indexStatus === "error" && <span className="filters-hint">{t("municipioPage.errorIndex")}</span>}
     </div>
   );
 }

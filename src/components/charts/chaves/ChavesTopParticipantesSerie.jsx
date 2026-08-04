@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { useI18n } from "../../../lib/i18n/I18nContext";
 import { ChartCard } from "../../shared/ChartCard";
 import { ChartTooltip } from "../../shared/ChartTooltip";
 import { CsvDownloadButton } from "../../shared/CsvDownloadButton";
@@ -112,6 +113,7 @@ export function ChavesTopParticipantesSerie({
   onStartChange,
   onEndChange,
 }) {
+  const { t } = useI18n();
   const { meses, PF, PJ } = topParticipantesSerie;
 
   // Cor de marca por participante — mesma cor para a mesma empresa nos dois
@@ -145,19 +147,19 @@ export function ChavesTopParticipantesSerie({
     for (const i of visibleIndices) {
       const mes = formatAnoMes(mesToAnoMes(meses[i]));
       for (const nome of PF.participantes) {
-        out.push({ Tipo: "Pessoa física", Mês: mes, Participante: nome, Chaves: PF.series[nome]?.[i] ?? 0 });
+        out.push({ [t("chavesPage.exportType")]: t("pfpj.pf"), [t("chavesPage.exportMonth")]: mes, [t("chavesPage.exportParticipant")]: nome, [t("chavesPage.exportKeys")]: PF.series[nome]?.[i] ?? 0 });
       }
       for (const nome of PJ.participantes) {
-        out.push({ Tipo: "Pessoa jurídica", Mês: mes, Participante: nome, Chaves: PJ.series[nome]?.[i] ?? 0 });
+        out.push({ [t("chavesPage.exportType")]: t("pfpj.pj"), [t("chavesPage.exportMonth")]: mes, [t("chavesPage.exportParticipant")]: nome, [t("chavesPage.exportKeys")]: PJ.series[nome]?.[i] ?? 0 });
       }
     }
     return out;
-  }, [visibleIndices, meses, PF, PJ]);
+  }, [visibleIndices, meses, PF, PJ, t]);
 
   return (
     <ChartCard
-      title="Evolução das chaves por participante (Top 10)"
-      subtitle="Série histórica dos 10 maiores participantes por tipo de usuário, ranqueados pelo estoque no último mês"
+      title={t("chavesPage.serieTitle")}
+      subtitle={t("chavesPage.serieSubtitle")}
       fullWidth
       tabs={
         <div className="top-serie-controls">
@@ -178,7 +180,7 @@ export function ChavesTopParticipantesSerie({
     >
       <div className="top-serie-grid">
         <Panel
-          title="Pessoa física"
+          title={t("pfpj.pf")}
           color="var(--series-1)"
           participantes={PF.participantes}
           rows={rowsPF}
@@ -186,7 +188,7 @@ export function ChavesTopParticipantesSerie({
         />
 
         <Panel
-          title="Pessoa jurídica"
+          title={t("pfpj.pj")}
           color="var(--series-2)"
           participantes={PJ.participantes}
           rows={rowsPJ}
@@ -194,7 +196,7 @@ export function ChavesTopParticipantesSerie({
         />
       </div>
 
-      <p className="top-serie-axis-label">Número de chaves cadastradas</p>
+      <p className="top-serie-axis-label">{t("chavesPage.keyAxisLabel")}</p>
 
       <style>
         {`

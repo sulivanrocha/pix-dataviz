@@ -7,6 +7,9 @@ import {
   formatAnoMes,
   formatNumberCompact,
 } from "../lib/format";
+import { Glossary } from "../components/shared/Glossary";
+import { useI18n } from "../lib/i18n/I18nContext";
+import { getGlossary } from "../lib/i18n/glossary";
 
 function getTimestamp(date) {
   if (!date) return 0;
@@ -19,6 +22,7 @@ function getTimestamp(date) {
 }
 
 export function ChavesPixPage({ chaves }) {
+  const { t, lang } = useI18n();
   const [topN, setTopN] = useState(5);
 
   const historicalData = useMemo(
@@ -70,7 +74,7 @@ export function ChavesPixPage({ chaves }) {
 
   const referenceMonth = useMemo(() => {
     if (!latestRecord?.data) {
-      return "último mês disponível";
+      return t("common.latestMonth");
     }
 
     const numericMonth = Number(
@@ -80,7 +84,7 @@ export function ChavesPixPage({ chaves }) {
     );
 
     return formatAnoMes(numericMonth);
-  }, [latestRecord]);
+  }, [latestRecord, t]);
 
   // Série histórica por participante (Top 10 por tipo). Só existe se o
   // snapshot foi gerado por uma versão do fetch-data.mjs que inclui a chave
@@ -106,21 +110,21 @@ export function ChavesPixPage({ chaves }) {
     <>
       <section className="kpi-row">
         <StatTile
-          label={`Total de chaves Pix (${referenceMonth})`}
+          label={t("chavesPage.kpiTotal", { month: referenceMonth })}
           value={formatNumberCompact(
             Number(latestRecord?.total) || 0
           )}
         />
 
         <StatTile
-          label={`Chaves de pessoa física (${referenceMonth})`}
+          label={t("chavesPage.kpiPf", { month: referenceMonth })}
           value={formatNumberCompact(
             Number(latestRecord?.PF) || 0
           )}
         />
 
         <StatTile
-          label={`Chaves de pessoa jurídica (${referenceMonth})`}
+          label={t("chavesPage.kpiPj", { month: referenceMonth })}
           value={formatNumberCompact(
             Number(latestRecord?.PJ) || 0
           )}
@@ -156,6 +160,8 @@ export function ChavesPixPage({ chaves }) {
           />
         </section>
       )}
+
+      <Glossary items={getGlossary("chaves", lang)} />
     </>
   );
 }

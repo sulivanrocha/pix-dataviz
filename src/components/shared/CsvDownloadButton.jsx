@@ -1,10 +1,13 @@
 import { exportCsv } from "../../lib/exportCsv";
+import { useI18n } from "../../lib/i18n/I18nContext";
 
 export function CsvDownloadButton({
   data,
   filename,
-  label = "Baixar CSV",
+  label,
 }) {
+  const { t } = useI18n();
+  const resolvedLabel = label ?? t("common.csvDownload");
   const disabled = !Array.isArray(data) || data.length === 0;
 
   return (
@@ -13,10 +16,10 @@ export function CsvDownloadButton({
       className="csv-download-button"
       disabled={disabled}
       onClick={() => exportCsv(filename, data)}
-      aria-label={label}
+      aria-label={resolvedLabel}
     >
       <span aria-hidden="true">↓</span>
-      <span>{label}</span>
+      <span>{resolvedLabel}</span>
 
       <style>
         {`

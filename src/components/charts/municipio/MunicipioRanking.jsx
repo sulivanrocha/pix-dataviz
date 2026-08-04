@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
+import { useI18n } from "../../../lib/i18n/I18nContext";
 import { ChartCard } from "../../shared/ChartCard";
 import { ChartTooltip } from "../../shared/ChartTooltip";
 import {
@@ -18,23 +19,6 @@ import {
 } from "../../../lib/format";
 
 const TOP_N = 10;
-
-const PERSPECTIVA_LABEL = {
-  Pagador: "pago",
-  Recebedor: "recebido",
-};
-
-const SEGMENTO_LABEL = {
-  Todos: "PF + PJ",
-  PF: "pessoa física",
-  PJ: "pessoa jurídica",
-};
-
-const VISAO_LABEL = {
-  valor: "valor",
-  transacoes: "transações",
-  pessoas: "pessoas",
-};
 
 /**
  * Prefixo do campo de cada visão.
@@ -92,11 +76,11 @@ function getMetricFields({ perspectiva, segmento, visao }) {
   return [`${prefixo}${perspectiva}${segmento}`];
 }
 
-function getMetricConfig(visao) {
+function getMetricConfig(visao, t) {
   if (visao === "valor") {
     return {
       dataKey: "valor",
-      seriesName: "Valor",
+      seriesName: t("municipioPage.seriesValue"),
       axisFormatter: formatCurrencyCompact,
       tooltipFormatter: formatCurrencyFull,
     };
@@ -106,8 +90,8 @@ function getMetricConfig(visao) {
     dataKey: "valor",
     seriesName:
       visao === "pessoas"
-        ? "Pessoas"
-        : "Transações",
+        ? t("municipioPage.seriesPeople")
+        : t("municipioPage.seriesTransactions"),
     axisFormatter: formatNumberCompact,
     tooltipFormatter: formatNumberCompact,
   };
@@ -138,14 +122,20 @@ function downloadCsv({
   start,
   end,
   mesReferencia,
+  t,
 }) {
   if (!rows.length) return;
 
+  const metricHeader = {
+    valor: t("municipioPage.metricValor"),
+    transacoes: t("municipioPage.metricTransacoes"),
+    pessoas: t("municipioPage.metricPessoas"),
+  }[visao];
   const header = [
-    "Posição",
-    "Município",
+    t("municipioPage.colPosition"),
+    t("municipioPage.colMunicipality"),
     "UF",
-    VISAO_LABEL[visao],
+    metricHeader,
   ];
 
   const body = rows.map((row, index) => [
@@ -211,6 +201,7 @@ export function MunicipioRanking({
   segmento = "Todos",
   visao = "valor",
 }) {
+  const { t } = useI18n();
   const [dataset, setDataset] = useState({
     status: "loading",
     municipios: [],
@@ -249,8 +240,8 @@ export function MunicipioRanking({
   }, []);
 
   const metricConfig = useMemo(
-    () => getMetricConfig(visao),
-    [visao]
+    () => getMetricConfig(visao, t),
+    [visao, t]
   );
 
   const metricFields = useMemo(
@@ -363,23 +354,49 @@ export function MunicipioRanking({
   ]);
 
   const perspectiveText =
-    PERSPECTIVA_LABEL[perspectiva];
+    perspectiva === "Pagador"
+      ? t("municipioPage.paid")
+      : t("municipioPage.received");
 
-  const metricText =
-    VISAO_LABEL[visao];
+  const metricText = {
+    valor: t("municipioPage.metricValor"),
+    transacoes: t("municipioPage.metricTransacoes"),
+    pessoas: t("municipioPage.metricPessoas"),
+  }[visao];
+
+  const segmentoText = {
+    Todos: t("municipioPage.segAll"),
+    PF: t("pfpj.pf"),
+    PJ: t("pfpj.pj"),
+  }[segmento];
+
+  const perspectivaLower =
+    perspectiva === "Pagador"
+      ? t("municipioPage.payer").toLowerCase()
+      : t("municipioPage.receiver").toLowerCase();
 
   const mesReferenciaLabel =
     formatMesReferencia(mesReferencia);
 
-  const title =
-    `Top ${TOP_N} municípios por ${metricText} ${perspectiveText}`;
+  const title = t("municipioPage.rankTopMunicipios", {
+    n: TOP_N,
+    metric: metricText,
+    perspective: perspectiveText,
+  });
 
   const subtitle =
     visao === "pessoas"
-      ? `${SEGMENTO_LABEL[segmento]}, perspectiva ${perspectiva.toLowerCase()}. Pessoas distintas em ${
-          mesReferenciaLabel || "—"
-        }, último mês do intervalo — contagens mensais não se somam ao longo do período. Brasil inteiro — não é afetado pelos filtros de região, estado e município.`
-      : `${SEGMENTO_LABEL[segmento]}, perspectiva ${perspectiva.toLowerCase()}, no período filtrado. Brasil inteiro — não é afetado pelos filtros de região, estado e município.`;
+      ? t("municipioPage.rankSubPeople", {
+          segment: segmentoText,
+          perspective: perspectivaLower,
+          month: mesReferenciaLabel || "—",
+          scope: t("common.brasilScope"),
+        })
+      : t("municipioPage.rankSubPeriod", {
+          segment: segmentoText,
+          perspective: perspectivaLower,
+          scope: t("common.brasilScope"),
+        });
 
   const actions = (
     <button
@@ -394,10 +411,11 @@ export function MunicipioRanking({
           start,
           end,
           mesReferencia,
+          t,
         })
       }
     >
-      Baixar CSV
+      {t("common.csvDownload")}
     </button>
   );
 

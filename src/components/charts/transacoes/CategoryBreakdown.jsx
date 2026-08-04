@@ -12,16 +12,27 @@ import {
   formatNumberFull,
 } from "../../../lib/format";
 import { categoryLabel, categoryColor } from "../../../lib/categories";
+import { getFormatLang } from "../../../lib/format";
+import { useI18n } from "../../../lib/i18n/I18nContext";
 
 const METRIC_FORMAT = {
-  VALOR: { compact: formatCurrencyCompact, full: formatCurrencyFull, label: "valor transacionado" },
-  QUANTIDADE: { compact: formatNumberCompact, full: formatNumberFull, label: "transações liquidadas" },
+  VALOR: {
+    compact: formatCurrencyCompact,
+    full: formatCurrencyFull,
+    labelKey: "transacoesPage.breakdownMetricValue",
+  },
+  QUANTIDADE: {
+    compact: formatNumberCompact,
+    full: formatNumberFull,
+    labelKey: "transacoesPage.breakdownMetricCount",
+  },
 };
 
 const SHARE_TICKS = [0, 25, 50, 75, 100];
 
 function formatPercent(value) {
-  return `${Number(value).toLocaleString("pt-BR", {
+  const locale = getFormatLang() === "en" ? "en-US" : "pt-BR";
+  return `${Number(value).toLocaleString(locale, {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   })}%`;
@@ -45,6 +56,7 @@ export function CategoryBreakdown({
   metric = "VALOR",
   mode = "absolute",
 }) {
+  const { t, lang } = useI18n();
   const metricCfg = METRIC_FORMAT[metric] ?? METRIC_FORMAT.VALOR;
   const isShare = mode === "share";
 
@@ -109,11 +121,14 @@ export function CategoryBreakdown({
 
   const tooltipFormat = isShare ? formatPercent : metricCfg.full;
 
-  const title = isShare ? "Composição por categoria (%)" : "Valor por categoria";
+  const metricLabel = t(metricCfg.labelKey);
+  const title = isShare
+    ? t("transacoesPage.breakdownShareTitle")
+    : t("transacoesPage.breakdownValueTitle");
 
   const subtitle = isShare
-    ? `Participação de cada categoria no ${metricCfg.label} de cada mês. Cada barra soma 100%.`
-    : `Composição mensal do ${metricCfg.label}, por dimensão selecionada.`;
+    ? t("transacoesPage.breakdownSubShare", { metric: metricLabel })
+    : t("transacoesPage.breakdownSubAbsolute", { metric: metricLabel });
 
   return (
     <ChartCard title={title} subtitle={subtitle}>
@@ -149,7 +164,7 @@ export function CategoryBreakdown({
             <Bar
               key={cat}
               dataKey={cat}
-              name={categoryLabel(dimensionKey, cat)}
+              name={categoryLabel(dimensionKey, cat, lang)}
               stackId="total"
               fill={categoryColor(dimensionKey, cat)}
               radius={0}

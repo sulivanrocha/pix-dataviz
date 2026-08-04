@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { useI18n } from "../../../lib/i18n/I18nContext";
 import { ChartCard } from "../../shared/ChartCard";
 import { ChartTooltip } from "../../shared/ChartTooltip";
 import { CsvDownloadButton } from "../../shared/CsvDownloadButton";
@@ -33,6 +34,7 @@ function ParticipantChart({
   rows,
   dataKey,
   color,
+  barName,
 }) {
   const chartHeight = chartHeightForRows(rows.length);
   const barSize = barSizeForBand(rows.length, chartHeight);
@@ -106,7 +108,7 @@ function ParticipantChart({
 
           <Bar
             dataKey={dataKey}
-            name="Número de chaves"
+            name={barName}
             fill={color}
             radius={[0, 4, 4, 0]}
             barSize={barSize}
@@ -124,6 +126,7 @@ export function ChavesPorParticipante({
   topN = 5,
   onTopNChange,
 }) {
+  const { t, lang } = useI18n();
   const rowsPF = useMemo(
     () =>
       [...porParticipante]
@@ -155,35 +158,35 @@ export function ChavesPorParticipante({
   const exportRows = useMemo(() => {
     const exportPF = rowsPF.map(
       (row, index) => ({
-        Tipo: "Pessoa física",
+        [t("chavesPage.exportType")]: t("pfpj.pf"),
         Ranking: index + 1,
-        Participante: row.participante,
-        Chaves: row.PF,
+        [t("chavesPage.exportParticipant")]: row.participante,
+        [t("chavesPage.exportKeys")]: row.PF,
       })
     );
 
     const exportPJ = rowsPJ.map(
       (row, index) => ({
-        Tipo: "Pessoa jurídica",
+        [t("chavesPage.exportType")]: t("pfpj.pj"),
         Ranking: index + 1,
-        Participante: row.participante,
-        Chaves: row.PJ,
+        [t("chavesPage.exportParticipant")]: row.participante,
+        [t("chavesPage.exportKeys")]: row.PJ,
       })
     );
 
     return [...exportPF, ...exportPJ];
-  }, [rowsPF, rowsPJ]);
+  }, [rowsPF, rowsPJ, t]);
 
   const referenceDate = data
     ? new Date(
         `${data}T00:00:00`
-      ).toLocaleDateString("pt-BR")
-    : "último mês disponível";
+      ).toLocaleDateString(lang === "en" ? "en-US" : "pt-BR")
+    : t("common.latestMonth");
 
   return (
     <ChartCard
-      title={`Top ${topN} participantes por chaves Pix cadastradas`}
-      subtitle={`Estoque em ${referenceDate}, com rankings separados para pessoas físicas e jurídicas`}
+      title={t("chavesPage.topTitle", { n: topN })}
+      subtitle={t("chavesPage.topSubtitle", { date: referenceDate })}
       fullWidth
       tabs={
         <div className="participant-chart-controls">
@@ -216,7 +219,8 @@ export function ChavesPorParticipante({
     >
       <div className="participant-charts-grid">
         <ParticipantChart
-          title="Pessoa física"
+          title={t("pfpj.pf")}
+          barName={t("common.keyCount")}
           rows={rowsPF}
           dataKey="PF"
           color={categoryColor(
@@ -226,7 +230,8 @@ export function ChavesPorParticipante({
         />
 
         <ParticipantChart
-          title="Pessoa jurídica"
+          title={t("pfpj.pj")}
+          barName={t("common.keyCount")}
           rows={rowsPJ}
           dataKey="PJ"
           color={categoryColor(

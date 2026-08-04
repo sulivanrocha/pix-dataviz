@@ -1,0 +1,3542 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 737d017..137e23f 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -28,14 +28,24 @@ Guidelines for working on this DataViz project.
+ 
+ ## 4. Project Architecture
+ 
+-- Keep reusable UI components in `src/components`.
+-- Keep visualizations in `src/components/charts`.
+-- Keep API access in `src/services`.
+-- Keep formatting and transformation functions in `src/utils`.
+-- Keep static datasets and configuration in `src/data`.
+-- Keep page-level composition in `src/App` or page components.
+-- Do not combine API fetching, data cleaning, and chart rendering in one large component.
++Actual directory layout (keep new code consistent with it):
++
++- `src/components/shared` — reusable UI primitives (`ChartCard`, `CsvDownloadButton`,
++  `ChartTooltip`, `Filters`, `StatTile`, `TabNav`).
++- `src/components/charts/<dataset>` — visualization components, grouped by dataset
++  (`chaves`, `dict`, `municipio`, `transacoes`).
++- `src/pages` — page-level composition, one file per tab route.
++- `src/lib` — data hooks, formatting, CSV export, and static config
++  (`usePixData`, `format`, `exportCsv`, `tabs`, `uf`, `categories`, etc.).
++- `public/data` — static dataset snapshots served to the app.
++- `scripts` — data-fetching tooling (`fetch-data.mjs`).
++
++Rules:
++
++- Do not combine data fetching, data cleaning, and chart rendering in one component.
++  Hooks in `src/lib` fetch; pages filter and compose; chart components render.
+ - Pass prepared data into visualization components through props.
++- Do not hardcode API data inside chart components.
+ 
+ ## 5. Data Visualization Standards
+ 
+@@ -43,12 +53,54 @@ Guidelines for working on this DataViz project.
+ - Prefer clarity and visual hierarchy over novelty.
+ - Use advanced visual forms only when they communicate the data better.
+ - Every visualization should have a clear title, unit, source, and relevant tooltip.
+-- Use consistent number, currency, percentage, and date formatting.
++- Use consistent number, currency, percentage, and date formatting (via `src/lib/format`).
+ - Avoid misleading scales, unnecessary 3D effects, and visual clutter.
+ - Ensure visualizations work on desktop and mobile.
+ - Include loading, empty, and error states.
+ - Use accessible labels and sufficient contrast.
+-- Do not hardcode API data inside chart components.
++
++### 5.1 CSV Export (required on every chart)
++
++Every chart is a data view, and every data view must be downloadable. There are no
++exceptions: a chart without a CSV export is considered incomplete.
++
++- Render `CsvDownloadButton` (`src/components/shared/CsvDownloadButton`) for each chart.
++- Place it in the `ChartCard` `tabs` slot, alongside any `Filters`. When both are
++  present, wrap them in a single flex container (see `UsersGrowthChart` for the
++  reference pattern).
++- Build a dedicated `exportRows` array with `useMemo`, deriving it from the same data
++  the chart renders. Use human-readable, Portuguese column headers (e.g. `Mês`,
++  `Pessoa física`) rather than internal field names.
++- Pass a descriptive, kebab-case `filename` ending in `.csv`
++  (e.g. `usuarios-dict.csv`, `ranking-municipios.csv`).
++- The button disables itself automatically when the data array is empty; do not add
++  separate guard logic.
++- A chart that displays multiple distinct series/panels (e.g. PF and PJ side by side)
++  exports a single CSV containing all series as columns, not one file per panel.
++
++Charts still missing this control (bring them to standard when touched):
++`MunicipioRanking`, `StateRanking`, `RegiaoSummaryChart`, `CategoryBreakdown`,
++`NaturezaMatrix`, `TrendChart`.
++
++### 5.2 Glossary (required on every content page)
++
++Each of the four content pages — Usuários (`UsuariosDictPage`), Chaves
++(`ChavesPixPage`), Transações por Município (`TransacoesMunicipioPage`), and
++Estatísticas de Transações (`EstatisticasTransacoesPage`) — must end with a glossary
++section explaining the acronyms and key terms used on that page. The Visão geral
++(`OverviewPage`) is exempt, as it is a non-technical landing page.
++
++- Reuse the existing markup and styles (`.definitions-section`, `.definitions-eyebrow`,
++  `.definitions-item`, `<dl>/<dt>/<dd>`) exactly as implemented in `UsuariosDictPage`.
++  Do not introduce new glossary styling.
++- Render the glossary as the last `<section>` on the page, after the charts.
++- Define each page's terms in a page-local `*_DEFINITIONS` constant — an array of
++  `{ term, description }` objects — matching the shape of `DICT_DEFINITIONS`.
++- Cover every non-obvious acronym and domain term that appears on the page (e.g. DICT,
++  PF/PJ, ISS, RREO, IBGE, natureza, finalidade, forma de iniciação). Each definition
++  should spell out the acronym on first use and explain it in plain Portuguese.
++- Keep definitions accurate to the Banco Central source semantics; when a term maps to
++  a specific API field or dataset column, describe what that field actually measures.
+ 
+ ## 6. Data and Performance
+ 
+@@ -71,9 +123,11 @@ Define success in verifiable terms.
+ 
+ Examples:
+ 
+-- “Fix chart responsiveness” → verify at desktop, tablet, and mobile widths.
+-- “Add API integration” → verify successful, loading, empty, and error states.
+-- “Change data transformation” → verify expected totals and sample records.
++- "Fix chart responsiveness" → verify at desktop, tablet, and mobile widths.
++- "Add CSV export to a chart" → verify the button renders, downloads a file with the
++  expected headers, and disables when data is empty.
++- "Add a page glossary" → verify the section renders last, covers every term on the
++  page, and reuses `.definitions-section` styling.
+ 
+ ## 8. Verification
+ 
+@@ -82,7 +136,7 @@ After meaningful changes:
+ 1. Run `npm run build`.
+ 2. Run linting or tests if configured.
+ 3. Check for browser console errors.
+-4. Verify the affected page visually.
++4. Verify the affected page visually, including CSV export and glossary where relevant.
+ 5. Report:
+    - files changed;
+    - checks performed;
+@@ -93,4 +147,4 @@ After meaningful changes:
+ 
+ Every changed line should be directly connected to the requested task.
+ 
+-These guidelines are successful when the project remains readable, visualizations remain accurate, and code changes are small and easy to review.
+\ No newline at end of file
++These guidelines are successful when the project remains readable, visualizations remain accurate, every chart is downloadable, every content page is self-explanatory, and code changes are small and easy to review.
+diff --git a/src/App.jsx b/src/App.jsx
+index 85377a5..4dfa43d 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -1,12 +1,15 @@
+ // src/App.jsx
+-// Rotas, cabeçalho e rodapé. O estado de aba agora vive na URL (react-router),
+-// não em useState — é isso que dá ao Google cinco páginas indexáveis em vez de uma.
++// Rotas, cabeçalho e rodapé. O estado de aba vive na URL (react-router),
++// não em useState — é isso que dá ao Google cinco páginas indexáveis.
++// O idioma é um toggle de UI (não muda a URL); todo texto passa por t().
+ 
+ import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+ import { usePixData } from "./lib/usePixData";
+ import { TabNav } from "./components/shared/TabNav";
++import { LanguageToggle } from "./components/shared/LanguageToggle";
+ import { tabFromPath } from "./lib/tabs";
+ import { useDocumentMeta } from "./lib/useDocumentMeta";
++import { useI18n } from "./lib/i18n/I18nContext";
+ import { OverviewPage } from "./pages/OverviewPage";
+ import { UsuariosDictPage } from "./pages/UsuariosDictPage";
+ import { ChavesPixPage } from "./pages/ChavesPixPage";
+@@ -16,21 +19,22 @@ import { EstatisticasTransacoesPage } from "./pages/EstatisticasTransacoesPage";
+ function App() {
+   const { status, data, error } = usePixData();
+   const location = useLocation();
++  const { lang, t } = useI18n();
+   const tab = tabFromPath(location.pathname);
+ 
+   // Precisa ficar acima dos early returns: hooks não podem vir depois de
+-  // um return condicional. tabFromPath só depende da URL, então é seguro.
+-  useDocumentMeta(tab);
++  // um return condicional. Depende de tab e lang, ambos seguros aqui.
++  useDocumentMeta(tab, lang);
+ 
+   if (status === "loading") {
+-    return <p className="state-message">Carregando dados do Pix...</p>;
++    return <p className="state-message">{t("state.loading")}</p>;
+   }
+ 
+   if (status === "error") {
+     return (
+       <p className="state-message">
+-        Não foi possível carregar os dados locais. Rode <code>node scripts/fetch-data.mjs</code> e recarregue a
+-        página.
++        {t("state.error", { command: "" })}
++        <code>node scripts/fetch-data.mjs</code>
+         <br />
+         {String(error)}
+       </p>
+@@ -39,27 +43,34 @@ function App() {
+ 
+   const { transacoes, usuariosDict, municipio, chaves } = data;
+ 
++  const snapshotDate = new Date(transacoes.generatedAt).toLocaleDateString(
++    lang === "en" ? "en-US" : "pt-BR"
++  );
++
+   return (
+     <>
+       <header className="app-header">
++        <div className="app-header__lang">
++          <LanguageToggle />
++        </div>
++
+         <div className="app-header__title">
+-          <h1>Dados do Pix</h1>
++          <h1>{t("header.title")}</h1>
+         </div>
+ 
+         <p className="app-header__subtitle">
+-          Visualizações interativas do Pix a partir dos dados abertos do Banco Central do Brasil. Snapshot
+-          gerado em {new Date(transacoes.generatedAt).toLocaleDateString("pt-BR")}.
++          {t("header.subtitle", { date: snapshotDate })}
+         </p>
+ 
+         <div className="app-header__meta">
+           <span className="app-header__author">
+-            Projeto independente por{" "}
++            {t("header.author")}{" "}
+             <a href="https://www.linkedin.com/in/sulivanrocha/" target="_blank" rel="noreferrer">
+               Sulivan Rocha
+             </a>
+           </span>
+           <span className="app-header__disclaimer">
+-            Não é um serviço oficial do Banco Central.
++            {t("header.disclaimer")}
+           </span>
+         </div>
+       </header>
+@@ -76,21 +87,21 @@ function App() {
+       </Routes>
+ 
+       <footer className="app-footer">
+-        Fonte: API pública de{" "}
++        {t("footer.source")}{" "}
+         <a
+           href="https://dadosabertos.bcb.gov.br/dataset/pix"
+           target="_blank"
+           rel="noreferrer"
+         >
+-          Dados Abertos do Banco Central do Brasil
++          {t("footer.sourceName")}
+         </a>
+-        . Código-fonte disponível no{" "}
++        . {t("footer.code")}{" "}
+         <a
+           href="https://github.com/sulivanrocha/pix-dataviz"
+           target="_blank"
+           rel="noreferrer"
+         >
+-          GitHub
++          {t("footer.github")}
+         </a>
+         .
+       </footer>
+@@ -98,4 +109,4 @@ function App() {
+   );
+ }
+ 
+-export default App;
+\ No newline at end of file
++export default App;
+diff --git a/src/components/MunicipioSelector.jsx b/src/components/MunicipioSelector.jsx
+index d27a789..5307898 100644
+--- a/src/components/MunicipioSelector.jsx
++++ b/src/components/MunicipioSelector.jsx
+@@ -1,13 +1,7 @@
+ import { useEffect, useMemo, useRef, useState } from "react";
++import { useI18n } from "../lib/i18n/I18nContext";
+ 
+-const REGIOES = [
+-  { value: "Todas", label: "Todas as regiões" },
+-  { value: "NORTE", label: "Norte" },
+-  { value: "NORDESTE", label: "Nordeste" },
+-  { value: "CENTRO-OESTE", label: "Centro-Oeste" },
+-  { value: "SUDESTE", label: "Sudeste" },
+-  { value: "SUL", label: "Sul" },
+-];
++const REGIAO_VALUES = ["Todas", "NORTE", "NORDESTE", "CENTRO-OESTE", "SUDESTE", "SUL"];
+ 
+ // Seletor em cascata Região → Estado → Município. Sempre identifica o
+ // município selecionado por Municipio_Ibge (nunca por nome, que pode se
+@@ -15,6 +9,11 @@ const REGIOES = [
+ // municipal em public/data/municipios/{estadoIbge}.json e repassa via
+ // onChange para quem for renderizar os dados (ex.: filtrar por Municipio_Ibge).
+ export function MunicipioSelector({ onChange = () => {} }) {
++  const { t } = useI18n();
++  const REGIOES = REGIAO_VALUES.map((value) => ({
++    value,
++    label: value === "Todas" ? t("common.allRegions") : t(`regions.${value}`),
++  }));
+   const [index, setIndex] = useState([]);
+   const [indexStatus, setIndexStatus] = useState("loading");
+ 
+@@ -136,7 +135,7 @@ export function MunicipioSelector({ onChange = () => {} }) {
+   return (
+     <div className="municipio-selector">
+       <label>
+-        Região
++        {t("municipioPage.region")}
+         <select
+           value={regiao}
+           onChange={(e) => handleRegiaoChange(e.target.value)}
+@@ -151,13 +150,13 @@ export function MunicipioSelector({ onChange = () => {} }) {
+       </label>
+ 
+       <label>
+-        Estado
++        {t("municipioPage.state")}
+         <select
+           value={estadoIbge}
+           onChange={(e) => handleEstadoChange(e.target.value)}
+         >
+           <option value="" disabled>
+-            Selecione o estado
++            {t("municipioPage.selectState")}
+           </option>
+           {estados.map((e) => (
+             <option key={e.estadoIbge} value={e.estadoIbge}>
+@@ -168,11 +167,11 @@ export function MunicipioSelector({ onChange = () => {} }) {
+       </label>
+ 
+       <label className="municipio-combobox">
+-        Município
++        {t("common.municipality")}
+         <input
+           type="text"
+           value={query}
+-          placeholder="Buscar município..."
++          placeholder={t("common.searchMunicipality")}
+           disabled={!estadoIbge}
+           onChange={(e) => {
+             setQuery(e.target.value);
+@@ -203,9 +202,9 @@ export function MunicipioSelector({ onChange = () => {} }) {
+         )}
+       </label>
+ 
+-      {estadoData.status === "loading" && <span className="filters-hint">Carregando dados do estado...</span>}
+-      {estadoData.status === "error" && <span className="filters-hint">Falha ao carregar dados do estado.</span>}
+-      {indexStatus === "error" && <span className="filters-hint">Falha ao carregar lista de municípios.</span>}
++      {estadoData.status === "loading" && <span className="filters-hint">{t("municipioPage.loadingState")}</span>}
++      {estadoData.status === "error" && <span className="filters-hint">{t("municipioPage.errorState")}</span>}
++      {indexStatus === "error" && <span className="filters-hint">{t("municipioPage.errorIndex")}</span>}
+     </div>
+   );
+ }
+\ No newline at end of file
+diff --git a/src/components/charts/chaves/ChavesHistorico.jsx b/src/components/charts/chaves/ChavesHistorico.jsx
+index b022625..2e86a3d 100644
+--- a/src/components/charts/chaves/ChavesHistorico.jsx
++++ b/src/components/charts/chaves/ChavesHistorico.jsx
+@@ -8,6 +8,7 @@ import {
+   Tooltip,
+   ResponsiveContainer,
+ } from "recharts";
++import { useI18n } from "../../../lib/i18n/I18nContext";
+ import { ChartCard } from "../../shared/ChartCard";
+ import { ChartTooltip } from "../../shared/ChartTooltip";
+ import { CsvDownloadButton } from "../../shared/CsvDownloadButton";
+@@ -108,6 +109,7 @@ function HistoryChart({
+ export function ChavesHistorico({
+   historico,
+ }) {
++  const { t } = useI18n();
+   const rows = useMemo(
+     () =>
+       historico.map((record) => ({
+@@ -132,13 +134,13 @@ export function ChavesHistorico({
+   const exportRows = useMemo(
+     () =>
+       rows.map((row) => ({
+-        Mês: row.mes,
++        [t("common.referenceMonth")]: row.mes,
+         Data: row.data,
+-        "Pessoa física": row.PF,
+-        "Pessoa jurídica": row.PJ,
++        [t("pfpj.pf")]: row.PF,
++        [t("pfpj.pj")]: row.PJ,
+         Total: row.total,
+       })),
+-    [rows]
++    [rows, t]
+   );
+ 
+   const months = rows.length;
+@@ -168,8 +170,8 @@ export function ChavesHistorico({
+ 
+   return (
+     <ChartCard
+-      title="Evolução das chaves Pix cadastradas"
+-      subtitle="Estoque mensal de chaves de pessoas físicas e jurídicas"
++      title={t("chavesPage.historicoTitle")}
++      subtitle={t("chavesPage.historicoSubtitle")}
+       fullWidth
+       tabs={
+         <CsvDownloadButton
+@@ -180,7 +182,7 @@ export function ChavesHistorico({
+     >
+       <div className="keys-history-grid">
+         <HistoryChart
+-          title="Pessoa física"
++          title={t("pfpj.pf")}
+           rows={rows}
+           dataKey="PF"
+           color={categoryColor(
+@@ -193,7 +195,7 @@ export function ChavesHistorico({
+         />
+ 
+         <HistoryChart
+-          title="Pessoa jurídica"
++          title={t("pfpj.pj")}
+           rows={rows}
+           dataKey="PJ"
+           color={categoryColor(
+diff --git a/src/components/charts/chaves/ChavesPorParticipante.jsx b/src/components/charts/chaves/ChavesPorParticipante.jsx
+index aad9f49..09b319e 100644
+--- a/src/components/charts/chaves/ChavesPorParticipante.jsx
++++ b/src/components/charts/chaves/ChavesPorParticipante.jsx
+@@ -8,6 +8,7 @@ import {
+   Tooltip,
+   ResponsiveContainer,
+ } from "recharts";
++import { useI18n } from "../../../lib/i18n/I18nContext";
+ import { ChartCard } from "../../shared/ChartCard";
+ import { ChartTooltip } from "../../shared/ChartTooltip";
+ import { CsvDownloadButton } from "../../shared/CsvDownloadButton";
+@@ -33,6 +34,7 @@ function ParticipantChart({
+   rows,
+   dataKey,
+   color,
++  barName,
+ }) {
+   const chartHeight = chartHeightForRows(rows.length);
+   const barSize = barSizeForBand(rows.length, chartHeight);
+@@ -106,7 +108,7 @@ function ParticipantChart({
+ 
+           <Bar
+             dataKey={dataKey}
+-            name="Número de chaves"
++            name={barName}
+             fill={color}
+             radius={[0, 4, 4, 0]}
+             barSize={barSize}
+@@ -124,6 +126,7 @@ export function ChavesPorParticipante({
+   topN = 5,
+   onTopNChange,
+ }) {
++  const { t, lang } = useI18n();
+   const rowsPF = useMemo(
+     () =>
+       [...porParticipante]
+@@ -155,35 +158,35 @@ export function ChavesPorParticipante({
+   const exportRows = useMemo(() => {
+     const exportPF = rowsPF.map(
+       (row, index) => ({
+-        Tipo: "Pessoa física",
++        [t("chavesPage.exportType")]: t("pfpj.pf"),
+         Ranking: index + 1,
+-        Participante: row.participante,
+-        Chaves: row.PF,
++        [t("chavesPage.exportParticipant")]: row.participante,
++        [t("chavesPage.exportKeys")]: row.PF,
+       })
+     );
+ 
+     const exportPJ = rowsPJ.map(
+       (row, index) => ({
+-        Tipo: "Pessoa jurídica",
++        [t("chavesPage.exportType")]: t("pfpj.pj"),
+         Ranking: index + 1,
+-        Participante: row.participante,
+-        Chaves: row.PJ,
++        [t("chavesPage.exportParticipant")]: row.participante,
++        [t("chavesPage.exportKeys")]: row.PJ,
+       })
+     );
+ 
+     return [...exportPF, ...exportPJ];
+-  }, [rowsPF, rowsPJ]);
++  }, [rowsPF, rowsPJ, t]);
+ 
+   const referenceDate = data
+     ? new Date(
+         `${data}T00:00:00`
+-      ).toLocaleDateString("pt-BR")
+-    : "último mês disponível";
++      ).toLocaleDateString(lang === "en" ? "en-US" : "pt-BR")
++    : t("common.latestMonth");
+ 
+   return (
+     <ChartCard
+-      title={`Top ${topN} participantes por chaves Pix cadastradas`}
+-      subtitle={`Estoque em ${referenceDate}, com rankings separados para pessoas físicas e jurídicas`}
++      title={t("chavesPage.topTitle", { n: topN })}
++      subtitle={t("chavesPage.topSubtitle", { date: referenceDate })}
+       fullWidth
+       tabs={
+         <div className="participant-chart-controls">
+@@ -216,7 +219,8 @@ export function ChavesPorParticipante({
+     >
+       <div className="participant-charts-grid">
+         <ParticipantChart
+-          title="Pessoa física"
++          title={t("pfpj.pf")}
++          barName={t("common.keyCount")}
+           rows={rowsPF}
+           dataKey="PF"
+           color={categoryColor(
+@@ -226,7 +230,8 @@ export function ChavesPorParticipante({
+         />
+ 
+         <ParticipantChart
+-          title="Pessoa jurídica"
++          title={t("pfpj.pj")}
++          barName={t("common.keyCount")}
+           rows={rowsPJ}
+           dataKey="PJ"
+           color={categoryColor(
+diff --git a/src/components/charts/chaves/ChavesTopParticipantesSerie.jsx b/src/components/charts/chaves/ChavesTopParticipantesSerie.jsx
+index 9358079..55e1cbc 100644
+--- a/src/components/charts/chaves/ChavesTopParticipantesSerie.jsx
++++ b/src/components/charts/chaves/ChavesTopParticipantesSerie.jsx
+@@ -8,6 +8,7 @@ import {
+   Tooltip,
+   ResponsiveContainer,
+ } from "recharts";
++import { useI18n } from "../../../lib/i18n/I18nContext";
+ import { ChartCard } from "../../shared/ChartCard";
+ import { ChartTooltip } from "../../shared/ChartTooltip";
+ import { CsvDownloadButton } from "../../shared/CsvDownloadButton";
+@@ -112,6 +113,7 @@ export function ChavesTopParticipantesSerie({
+   onStartChange,
+   onEndChange,
+ }) {
++  const { t } = useI18n();
+   const { meses, PF, PJ } = topParticipantesSerie;
+ 
+   // Cor de marca por participante — mesma cor para a mesma empresa nos dois
+@@ -145,19 +147,19 @@ export function ChavesTopParticipantesSerie({
+     for (const i of visibleIndices) {
+       const mes = formatAnoMes(mesToAnoMes(meses[i]));
+       for (const nome of PF.participantes) {
+-        out.push({ Tipo: "Pessoa física", Mês: mes, Participante: nome, Chaves: PF.series[nome]?.[i] ?? 0 });
++        out.push({ [t("chavesPage.exportType")]: t("pfpj.pf"), [t("chavesPage.exportMonth")]: mes, [t("chavesPage.exportParticipant")]: nome, [t("chavesPage.exportKeys")]: PF.series[nome]?.[i] ?? 0 });
+       }
+       for (const nome of PJ.participantes) {
+-        out.push({ Tipo: "Pessoa jurídica", Mês: mes, Participante: nome, Chaves: PJ.series[nome]?.[i] ?? 0 });
++        out.push({ [t("chavesPage.exportType")]: t("pfpj.pj"), [t("chavesPage.exportMonth")]: mes, [t("chavesPage.exportParticipant")]: nome, [t("chavesPage.exportKeys")]: PJ.series[nome]?.[i] ?? 0 });
+       }
+     }
+     return out;
+-  }, [visibleIndices, meses, PF, PJ]);
++  }, [visibleIndices, meses, PF, PJ, t]);
+ 
+   return (
+     <ChartCard
+-      title="Evolução das chaves por participante (Top 10)"
+-      subtitle="Série histórica dos 10 maiores participantes por tipo de usuário, ranqueados pelo estoque no último mês"
++      title={t("chavesPage.serieTitle")}
++      subtitle={t("chavesPage.serieSubtitle")}
+       fullWidth
+       tabs={
+         <div className="top-serie-controls">
+@@ -178,7 +180,7 @@ export function ChavesTopParticipantesSerie({
+     >
+       <div className="top-serie-grid">
+         <Panel
+-          title="Pessoa física"
++          title={t("pfpj.pf")}
+           color="var(--series-1)"
+           participantes={PF.participantes}
+           rows={rowsPF}
+@@ -186,7 +188,7 @@ export function ChavesTopParticipantesSerie({
+         />
+ 
+         <Panel
+-          title="Pessoa jurídica"
++          title={t("pfpj.pj")}
+           color="var(--series-2)"
+           participantes={PJ.participantes}
+           rows={rowsPJ}
+@@ -194,7 +196,7 @@ export function ChavesTopParticipantesSerie({
+         />
+       </div>
+ 
+-      <p className="top-serie-axis-label">Número de chaves cadastradas</p>
++      <p className="top-serie-axis-label">{t("chavesPage.keyAxisLabel")}</p>
+ 
+       <style>
+         {`
+diff --git a/src/components/charts/dict/UsersGrowthChart.jsx b/src/components/charts/dict/UsersGrowthChart.jsx
+index 4770251..6a7bc99 100644
+--- a/src/components/charts/dict/UsersGrowthChart.jsx
++++ b/src/components/charts/dict/UsersGrowthChart.jsx
+@@ -17,6 +17,7 @@ import {
+   formatNumberCompact,
+   formatNumberFull,
+ } from "../../../lib/format";
++import { useI18n } from "../../../lib/i18n/I18nContext";
+ 
+ export function UsersGrowthChart({
+   usuariosDict,
+@@ -26,6 +27,7 @@ export function UsersGrowthChart({
+   onStartChange,
+   onEndChange,
+ }) {
++  const { t } = useI18n();
+   const rows = useMemo(
+     () =>
+       usuariosDict.map((r) => ({
+@@ -41,11 +43,11 @@ export function UsersGrowthChart({
+   const exportRows = useMemo(
+     () =>
+       rows.map((row) => ({
+-        Mes: row.mes,
+-        "Pessoa física": row.pessoaFisica,
+-        "Pessoa jurídica": row.pessoaJuridica,
++        [t("common.referenceMonth")]: row.mes,
++        [t("pfpj.pf")]: row.pessoaFisica,
++        [t("pfpj.pj")]: row.pessoaJuridica,
+       })),
+-    [rows]
++    [rows, t]
+   );
+ 
+   const monthCount = rows.length;
+@@ -75,8 +77,8 @@ export function UsersGrowthChart({
+ 
+   return (
+     <ChartCard
+-      title="Usuários cadastrados no DICT"
+-      subtitle="Evolução mensal de pessoas físicas e jurídicas desde o lançamento do Pix"
++      title={t("dictPage.chartTitle")}
++      subtitle={t("dictPage.chartSubtitle")}
+       fullWidth
+       tabs={
+         <div className="users-growth-controls">
+@@ -101,7 +103,7 @@ export function UsersGrowthChart({
+             className="users-growth-panel__title"
+             style={{ color: "var(--series-1)" }}
+           >
+-            Pessoa física
++            {t("pfpj.pf")}
+           </h3>
+ 
+           <ResponsiveContainer width="100%" height={300}>
+@@ -158,7 +160,7 @@ export function UsersGrowthChart({
+ 
+               <Bar
+                 dataKey="pessoaFisica"
+-                name="Pessoa física"
++                name={t("pfpj.pf")}
+                 fill="var(--series-1)"
+                 radius={[3, 3, 0, 0]}
+                 barSize={barSize}
+@@ -173,7 +175,7 @@ export function UsersGrowthChart({
+             className="users-growth-panel__title"
+             style={{ color: "var(--series-2)" }}
+           >
+-            Pessoa jurídica
++            {t("pfpj.pj")}
+           </h3>
+ 
+           <ResponsiveContainer width="100%" height={300}>
+@@ -230,7 +232,7 @@ export function UsersGrowthChart({
+ 
+               <Bar
+                 dataKey="pessoaJuridica"
+-                name="Pessoa jurídica"
++                name={t("pfpj.pj")}
+                 fill="var(--series-2)"
+                 radius={[3, 3, 0, 0]}
+                 barSize={barSize}
+diff --git a/src/components/charts/municipio/MunicipioRanking.jsx b/src/components/charts/municipio/MunicipioRanking.jsx
+index 3eaf839..ef4fbbd 100644
+--- a/src/components/charts/municipio/MunicipioRanking.jsx
++++ b/src/components/charts/municipio/MunicipioRanking.jsx
+@@ -9,6 +9,7 @@ import {
+   ResponsiveContainer,
+   Cell,
+ } from "recharts";
++import { useI18n } from "../../../lib/i18n/I18nContext";
+ import { ChartCard } from "../../shared/ChartCard";
+ import { ChartTooltip } from "../../shared/ChartTooltip";
+ import {
+@@ -19,23 +20,6 @@ import {
+ 
+ const TOP_N = 10;
+ 
+-const PERSPECTIVA_LABEL = {
+-  Pagador: "pago",
+-  Recebedor: "recebido",
+-};
+-
+-const SEGMENTO_LABEL = {
+-  Todos: "PF + PJ",
+-  PF: "pessoa física",
+-  PJ: "pessoa jurídica",
+-};
+-
+-const VISAO_LABEL = {
+-  valor: "valor",
+-  transacoes: "transações",
+-  pessoas: "pessoas",
+-};
+-
+ /**
+  * Prefixo do campo de cada visão.
+  *
+@@ -92,11 +76,11 @@ function getMetricFields({ perspectiva, segmento, visao }) {
+   return [`${prefixo}${perspectiva}${segmento}`];
+ }
+ 
+-function getMetricConfig(visao) {
++function getMetricConfig(visao, t) {
+   if (visao === "valor") {
+     return {
+       dataKey: "valor",
+-      seriesName: "Valor",
++      seriesName: t("municipioPage.seriesValue"),
+       axisFormatter: formatCurrencyCompact,
+       tooltipFormatter: formatCurrencyFull,
+     };
+@@ -106,8 +90,8 @@ function getMetricConfig(visao) {
+     dataKey: "valor",
+     seriesName:
+       visao === "pessoas"
+-        ? "Pessoas"
+-        : "Transações",
++        ? t("municipioPage.seriesPeople")
++        : t("municipioPage.seriesTransactions"),
+     axisFormatter: formatNumberCompact,
+     tooltipFormatter: formatNumberCompact,
+   };
+@@ -138,14 +122,20 @@ function downloadCsv({
+   start,
+   end,
+   mesReferencia,
++  t,
+ }) {
+   if (!rows.length) return;
+ 
++  const metricHeader = {
++    valor: t("municipioPage.metricValor"),
++    transacoes: t("municipioPage.metricTransacoes"),
++    pessoas: t("municipioPage.metricPessoas"),
++  }[visao];
+   const header = [
+-    "Posição",
+-    "Município",
++    t("municipioPage.colPosition"),
++    t("municipioPage.colMunicipality"),
+     "UF",
+-    VISAO_LABEL[visao],
++    metricHeader,
+   ];
+ 
+   const body = rows.map((row, index) => [
+@@ -211,6 +201,7 @@ export function MunicipioRanking({
+   segmento = "Todos",
+   visao = "valor",
+ }) {
++  const { t } = useI18n();
+   const [dataset, setDataset] = useState({
+     status: "loading",
+     municipios: [],
+@@ -249,8 +240,8 @@ export function MunicipioRanking({
+   }, []);
+ 
+   const metricConfig = useMemo(
+-    () => getMetricConfig(visao),
+-    [visao]
++    () => getMetricConfig(visao, t),
++    [visao, t]
+   );
+ 
+   const metricFields = useMemo(
+@@ -363,23 +354,49 @@ export function MunicipioRanking({
+   ]);
+ 
+   const perspectiveText =
+-    PERSPECTIVA_LABEL[perspectiva];
+-
+-  const metricText =
+-    VISAO_LABEL[visao];
++    perspectiva === "Pagador"
++      ? t("municipioPage.paid")
++      : t("municipioPage.received");
++
++  const metricText = {
++    valor: t("municipioPage.metricValor"),
++    transacoes: t("municipioPage.metricTransacoes"),
++    pessoas: t("municipioPage.metricPessoas"),
++  }[visao];
++
++  const segmentoText = {
++    Todos: t("municipioPage.segAll"),
++    PF: t("pfpj.pf"),
++    PJ: t("pfpj.pj"),
++  }[segmento];
++
++  const perspectivaLower =
++    perspectiva === "Pagador"
++      ? t("municipioPage.payer").toLowerCase()
++      : t("municipioPage.receiver").toLowerCase();
+ 
+   const mesReferenciaLabel =
+     formatMesReferencia(mesReferencia);
+ 
+-  const title =
+-    `Top ${TOP_N} municípios por ${metricText} ${perspectiveText}`;
++  const title = t("municipioPage.rankTopMunicipios", {
++    n: TOP_N,
++    metric: metricText,
++    perspective: perspectiveText,
++  });
+ 
+   const subtitle =
+     visao === "pessoas"
+-      ? `${SEGMENTO_LABEL[segmento]}, perspectiva ${perspectiva.toLowerCase()}. Pessoas distintas em ${
+-          mesReferenciaLabel || "—"
+-        }, último mês do intervalo — contagens mensais não se somam ao longo do período. Brasil inteiro — não é afetado pelos filtros de região, estado e município.`
+-      : `${SEGMENTO_LABEL[segmento]}, perspectiva ${perspectiva.toLowerCase()}, no período filtrado. Brasil inteiro — não é afetado pelos filtros de região, estado e município.`;
++      ? t("municipioPage.rankSubPeople", {
++          segment: segmentoText,
++          perspective: perspectivaLower,
++          month: mesReferenciaLabel || "—",
++          scope: t("common.brasilScope"),
++        })
++      : t("municipioPage.rankSubPeriod", {
++          segment: segmentoText,
++          perspective: perspectivaLower,
++          scope: t("common.brasilScope"),
++        });
+ 
+   const actions = (
+     <button
+@@ -394,10 +411,11 @@ export function MunicipioRanking({
+           start,
+           end,
+           mesReferencia,
++          t,
+         })
+       }
+     >
+-      Baixar CSV
++      {t("common.csvDownload")}
+     </button>
+   );
+ 
+diff --git a/src/components/charts/municipio/RegiaoSummaryChart.jsx b/src/components/charts/municipio/RegiaoSummaryChart.jsx
+index 09b12d0..66405f8 100644
+--- a/src/components/charts/municipio/RegiaoSummaryChart.jsx
++++ b/src/components/charts/municipio/RegiaoSummaryChart.jsx
+@@ -2,6 +2,7 @@ import { useMemo } from "react";
+ import {
+   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+ } from "recharts";
++import { useI18n } from "../../../lib/i18n/I18nContext";
+ import { ChartCard } from "../../shared/ChartCard";
+ import { ChartTooltip } from "../../shared/ChartTooltip";
+ import {
+@@ -11,20 +12,6 @@ import {
+   formatNumberCompact,
+ } from "../../../lib/format";
+ 
+-const SEGMENTO_LABEL = {
+-  Todos: "PF + PJ",
+-  PF: "pessoa física",
+-  PJ: "pessoa jurídica",
+-};
+-
+-// Título por visão × perspectiva, com concordância correta
+-// ("Valor pago" / "Transações pagas").
+-const TITULO_METRICA = {
+-  valor: { Pagador: "Valor pago", Recebedor: "Valor recebido" },
+-  transacoes: { Pagador: "Transações pagas", Recebedor: "Transações recebidas" },
+-  pessoas: { Pagador: "Pessoas pagadoras", Recebedor: "Pessoas recebedoras" },
+-};
+-
+ function valorField(perspectiva, seg) {
+   return `VL_${perspectiva}${seg}`;
+ }
+@@ -54,11 +41,11 @@ function sumBySegmento(row, perspectiva, segmento, fieldFn) {
+ }
+ 
+ // Configuração de série/formatadores por visão.
+-function getMetricConfig(visao) {
++function getMetricConfig(visao, t) {
+   if (visao === "valor") {
+     return {
+       dataKey: "valor",
+-      seriesName: "Valor",
++      seriesName: t("municipioPage.seriesValue"),
+       axisFormatter: formatCurrencyCompact,
+       tooltipFormatter: formatCurrencyFull,
+     };
+@@ -67,7 +54,7 @@ function getMetricConfig(visao) {
+   if (visao === "transacoes") {
+     return {
+       dataKey: "quantidade",
+-      seriesName: "Transações",
++      seriesName: t("municipioPage.seriesTransactions"),
+       axisFormatter: formatNumberCompact,
+       tooltipFormatter: formatNumberCompact,
+     };
+@@ -76,7 +63,7 @@ function getMetricConfig(visao) {
+   if (visao === "pessoas") {
+     return {
+       dataKey: "pessoas",
+-      seriesName: "Pessoas",
++      seriesName: t("municipioPage.seriesPeople"),
+       axisFormatter: formatNumberCompact,
+       tooltipFormatter: formatNumberCompact,
+     };
+@@ -98,9 +85,10 @@ export function RegiaoSummaryChart({
+   visao = "valor",
+   ultimoMesCompleto,
+ }) {
++  const { t } = useI18n();
+   const nivelMunicipio = Boolean(municipio && serieMunicipio?.length);
+ 
+-  const metricConfig = getMetricConfig(visao);
++  const metricConfig = getMetricConfig(visao, t);
+ 
+   const estadoNome = useMemo(() => {
+     if (!estadoIbge) return null;
+@@ -171,26 +159,46 @@ export function RegiaoSummaryChart({
+   ]);
+ 
+   const scopeParts = [];
+-  if (regiao && regiao !== "Todas") scopeParts.push(regiao);
++  if (regiao && regiao !== "Todas") scopeParts.push(t(`regions.${regiao}`));
+   if (estadoNome) scopeParts.push(estadoNome);
+   if (nivelMunicipio) scopeParts.push(`${municipio.nome}, ${municipio.uf}`);
+   const scopeLabel = scopeParts.length > 0
+     ? scopeParts.join(" › ")
+-    : "Brasil (todos os estados)";
++    : t("municipioPage.regiaoScopeBrasil");
++
++  const TITULO_METRICA = {
++    valor: {
++      Pagador: t("municipioPage.regiaoValorPago"),
++      Recebedor: t("municipioPage.regiaoValorRecebido"),
++    },
++    transacoes: {
++      Pagador: t("municipioPage.regiaoTransacoesPagas"),
++      Recebedor: t("municipioPage.regiaoTransacoesRecebidas"),
++    },
++    pessoas: {
++      Pagador: t("municipioPage.regiaoPessoasPagadoras"),
++      Recebedor: t("municipioPage.regiaoPessoasRecebedoras"),
++    },
++  };
++  const segmentoText = {
++    Todos: t("municipioPage.segAll"),
++    PF: t("pfpj.pf"),
++    PJ: t("pfpj.pj"),
++  }[segmento];
+ 
+   const tituloMetrica =
+-    TITULO_METRICA[visao]?.[perspectiva] ?? "Série histórica";
++    TITULO_METRICA[visao]?.[perspectiva] ?? t("municipioPage.regiaoFallbackTitle");
+ 
+   // Em Pessoas cada barra é uma contagem independente do mês — falar em "soma
+   // mensal" sugeriria um acumulado que não existe.
+   const subtitle =
+     visao === "pessoas"
+-      ? `Pessoas distintas de ${SEGMENTO_LABEL[segmento]} em cada mês, atualizada conforme todos os filtros da página. As barras não se acumulam: quem transaciona em vários meses é contado em cada um deles.`
+-      : `Soma mensal de ${SEGMENTO_LABEL[segmento]}, atualizada conforme todos os filtros da página.`;
++      ? t("municipioPage.regiaoSubPeople", { segment: segmentoText })
++      : t("municipioPage.regiaoSubDefault", { segment: segmentoText });
+ 
+   return (
+     <ChartCard
+-      title={`${tituloMetrica}, mês a mês: ${scopeLabel}`}
++      title={t("municipioPage.regiaoChartTitle", { metric: tituloMetrica, scope: scopeLabel })}
+       subtitle={subtitle}
+       fullWidth
+     >
+diff --git a/src/components/charts/municipio/StateRanking.jsx b/src/components/charts/municipio/StateRanking.jsx
+index 5c07842..9cd058d 100644
+--- a/src/components/charts/municipio/StateRanking.jsx
++++ b/src/components/charts/municipio/StateRanking.jsx
+@@ -9,6 +9,7 @@ import {
+   ResponsiveContainer,
+   Cell,
+ } from "recharts";
++import { useI18n } from "../../../lib/i18n/I18nContext";
+ import { ChartCard } from "../../shared/ChartCard";
+ import { ChartTooltip } from "../../shared/ChartTooltip";
+ import {
+@@ -19,23 +20,6 @@ import {
+ 
+ const TOP_N = 10;
+ 
+-const PERSPECTIVA_LABEL = {
+-  Pagador: "pago",
+-  Recebedor: "recebido",
+-};
+-
+-const SEGMENTO_LABEL = {
+-  Todos: "PF + PJ",
+-  PF: "pessoa física",
+-  PJ: "pessoa jurídica",
+-};
+-
+-const VISAO_LABEL = {
+-  valor: "valor",
+-  transacoes: "transações",
+-  pessoas: "pessoas",
+-};
+-
+ /**
+  * Prefixo do campo de cada visão.
+  *
+@@ -92,11 +76,11 @@ function getMetricFields({ perspectiva, segmento, visao }) {
+   return [`${prefixo}${perspectiva}${segmento}`];
+ }
+ 
+-function getMetricConfig(visao) {
++function getMetricConfig(visao, t) {
+   if (visao === "valor") {
+     return {
+       dataKey: "valor",
+-      seriesName: "Valor",
++      seriesName: t("municipioPage.seriesValue"),
+       axisFormatter: formatCurrencyCompact,
+       tooltipFormatter: formatCurrencyFull,
+     };
+@@ -106,8 +90,8 @@ function getMetricConfig(visao) {
+     dataKey: "valor",
+     seriesName:
+       visao === "pessoas"
+-        ? "Pessoas"
+-        : "Transações",
++        ? t("municipioPage.seriesPeople")
++        : t("municipioPage.seriesTransactions"),
+     axisFormatter: formatNumberCompact,
+     tooltipFormatter: formatNumberCompact,
+   };
+@@ -138,13 +122,19 @@ function downloadCsv({
+   start,
+   end,
+   mesReferencia,
++  t,
+ }) {
+   if (!rows.length) return;
+ 
++  const metricHeader = {
++    valor: t("municipioPage.metricValor"),
++    transacoes: t("municipioPage.metricTransacoes"),
++    pessoas: t("municipioPage.metricPessoas"),
++  }[visao];
+   const header = [
+-    "Posição",
+-    "Estado",
+-    VISAO_LABEL[visao],
++    t("municipioPage.colPosition"),
++    t("municipioPage.colState"),
++    metricHeader,
+   ];
+ 
+   const body = rows.map((row, index) => [
+@@ -208,9 +198,10 @@ export function StateRanking({
+    */
+   fullWidth = false,
+ }) {
++  const { t } = useI18n();
+   const metricConfig = useMemo(
+-    () => getMetricConfig(visao),
+-    [visao]
++    () => getMetricConfig(visao, t),
++    [visao, t]
+   );
+ 
+   const metricFields = useMemo(
+@@ -331,32 +322,62 @@ export function StateRanking({
+   ]);
+ 
+   const perspectiveText =
+-    PERSPECTIVA_LABEL[perspectiva];
+-
+-  const metricText =
+-    VISAO_LABEL[visao];
++    perspectiva === "Pagador"
++      ? t("municipioPage.paid")
++      : t("municipioPage.received");
++
++  const metricText = {
++    valor: t("municipioPage.metricValor"),
++    transacoes: t("municipioPage.metricTransacoes"),
++    pessoas: t("municipioPage.metricPessoas"),
++  }[visao];
++
++  const segmentoText = {
++    Todos: t("municipioPage.segAll"),
++    PF: t("pfpj.pf"),
++    PJ: t("pfpj.pj"),
++  }[segmento];
++
++  const perspectivaLower =
++    perspectiva === "Pagador"
++      ? t("municipioPage.payer").toLowerCase()
++      : t("municipioPage.receiver").toLowerCase();
+ 
+   const mesReferenciaLabel =
+     formatMesReferencia(mesReferencia);
+ 
+   const title = estadoIbge
+-    ? `${metricText} ${perspectiveText} no estado selecionado`
+-    : `Top ${TOP_N} estados por ${metricText} ${perspectiveText}`;
++    ? t("municipioPage.rankStateSelected", {
++        metric: metricText,
++        perspective: perspectiveText,
++      })
++    : t("municipioPage.rankTopStates", {
++        n: TOP_N,
++        metric: metricText,
++        perspective: perspectiveText,
++      });
+ 
+   const escopoNacional =
+     (!regiao || regiao === "Todas") &&
+     !estadoIbge;
+ 
+   const escopoTexto = escopoNacional
+-    ? " Brasil inteiro — não é afetado pelos filtros de região, estado e município."
++    ? t("common.brasilScope")
+     : "";
+ 
+   const subtitle =
+     visao === "pessoas"
+-      ? `${SEGMENTO_LABEL[segmento]}, perspectiva ${perspectiva.toLowerCase()}. Pessoas distintas em ${
+-          mesReferenciaLabel || "—"
+-        }, último mês do intervalo — contagens mensais não se somam ao longo do período.${escopoTexto}`
+-      : `${SEGMENTO_LABEL[segmento]}, perspectiva ${perspectiva.toLowerCase()}, no período filtrado.${escopoTexto}`;
++      ? t("municipioPage.rankSubPeople", {
++          segment: segmentoText,
++          perspective: perspectivaLower,
++          month: mesReferenciaLabel || "—",
++          scope: escopoTexto,
++        })
++      : t("municipioPage.rankSubPeriod", {
++          segment: segmentoText,
++          perspective: perspectivaLower,
++          scope: escopoTexto,
++        });
+ 
+   const actions = (
+     <button
+@@ -371,10 +392,11 @@ export function StateRanking({
+           start,
+           end,
+           mesReferencia,
++          t,
+         })
+       }
+     >
+-      Baixar CSV
++      {t("common.csvDownload")}
+     </button>
+   );
+ 
+diff --git a/src/components/charts/transacoes/CategoryBreakdown.jsx b/src/components/charts/transacoes/CategoryBreakdown.jsx
+index 9c0c130..0639083 100644
+--- a/src/components/charts/transacoes/CategoryBreakdown.jsx
++++ b/src/components/charts/transacoes/CategoryBreakdown.jsx
+@@ -12,16 +12,27 @@ import {
+   formatNumberFull,
+ } from "../../../lib/format";
+ import { categoryLabel, categoryColor } from "../../../lib/categories";
++import { getFormatLang } from "../../../lib/format";
++import { useI18n } from "../../../lib/i18n/I18nContext";
+ 
+ const METRIC_FORMAT = {
+-  VALOR: { compact: formatCurrencyCompact, full: formatCurrencyFull, label: "valor transacionado" },
+-  QUANTIDADE: { compact: formatNumberCompact, full: formatNumberFull, label: "transações liquidadas" },
++  VALOR: {
++    compact: formatCurrencyCompact,
++    full: formatCurrencyFull,
++    labelKey: "transacoesPage.breakdownMetricValue",
++  },
++  QUANTIDADE: {
++    compact: formatNumberCompact,
++    full: formatNumberFull,
++    labelKey: "transacoesPage.breakdownMetricCount",
++  },
+ };
+ 
+ const SHARE_TICKS = [0, 25, 50, 75, 100];
+ 
+ function formatPercent(value) {
+-  return `${Number(value).toLocaleString("pt-BR", {
++  const locale = getFormatLang() === "en" ? "en-US" : "pt-BR";
++  return `${Number(value).toLocaleString(locale, {
+     minimumFractionDigits: 1,
+     maximumFractionDigits: 1,
+   })}%`;
+@@ -45,6 +56,7 @@ export function CategoryBreakdown({
+   metric = "VALOR",
+   mode = "absolute",
+ }) {
++  const { t, lang } = useI18n();
+   const metricCfg = METRIC_FORMAT[metric] ?? METRIC_FORMAT.VALOR;
+   const isShare = mode === "share";
+ 
+@@ -109,11 +121,14 @@ export function CategoryBreakdown({
+ 
+   const tooltipFormat = isShare ? formatPercent : metricCfg.full;
+ 
+-  const title = isShare ? "Composição por categoria (%)" : "Valor por categoria";
++  const metricLabel = t(metricCfg.labelKey);
++  const title = isShare
++    ? t("transacoesPage.breakdownShareTitle")
++    : t("transacoesPage.breakdownValueTitle");
+ 
+   const subtitle = isShare
+-    ? `Participação de cada categoria no ${metricCfg.label} de cada mês. Cada barra soma 100%.`
+-    : `Composição mensal do ${metricCfg.label}, por dimensão selecionada.`;
++    ? t("transacoesPage.breakdownSubShare", { metric: metricLabel })
++    : t("transacoesPage.breakdownSubAbsolute", { metric: metricLabel });
+ 
+   return (
+     <ChartCard title={title} subtitle={subtitle}>
+@@ -149,7 +164,7 @@ export function CategoryBreakdown({
+             <Bar
+               key={cat}
+               dataKey={cat}
+-              name={categoryLabel(dimensionKey, cat)}
++              name={categoryLabel(dimensionKey, cat, lang)}
+               stackId="total"
+               fill={categoryColor(dimensionKey, cat)}
+               radius={0}
+diff --git a/src/components/charts/transacoes/NaturezaMatrix.jsx b/src/components/charts/transacoes/NaturezaMatrix.jsx
+index b798b35..49948c0 100644
+--- a/src/components/charts/transacoes/NaturezaMatrix.jsx
++++ b/src/components/charts/transacoes/NaturezaMatrix.jsx
+@@ -1,5 +1,7 @@
+ import { useEffect, useMemo, useRef, useState } from "react";
+ import { ChartCard } from "../../shared/ChartCard";
++import { useI18n } from "../../../lib/i18n/I18nContext";
++import { getFormatLang } from "../../../lib/format";
+ import {
+   formatAnoMes,
+   formatCurrencyCompact,
+@@ -14,18 +16,18 @@ import {
+  * é o pagador e a segunda o recebedor:
+  * P = pessoa física, B = empresa (business), G = governo.
+  */
+-const ENTIDADES = [
+-  { code: "P", label: "Pessoas", short: "P" },
+-  { code: "B", label: "Empresas", short: "B" },
+-  { code: "G", label: "Governo", short: "G" },
++const ENTIDADE_DEFS = [
++  { code: "P", labelKey: "transacoesPage.matrixEntityPeople", short: "P" },
++  { code: "B", labelKey: "transacoesPage.matrixEntityBusiness", short: "B" },
++  { code: "G", labelKey: "transacoesPage.matrixEntityGovernment", short: "G" },
+ ];
+ 
+ const NATUREZA_REGEX = /^([PBG])2([PBG])$/;
+ 
+-const METRICAS = [
+-  { value: "valor", label: "Valor (R$)" },
+-  { value: "quantidade", label: "Transações" },
+-  { value: "ticket", label: "Ticket médio" },
++const METRICA_DEFS = [
++  { value: "valor", labelKey: "transacoesPage.matrixMetricValue" },
++  { value: "quantidade", labelKey: "transacoesPage.matrixMetricCount" },
++  { value: "ticket", labelKey: "transacoesPage.matrixMetricTicket" },
+ ];
+ 
+ /**
+@@ -74,6 +76,25 @@ function corDaCelula(intensidade) {
+ }
+ 
+ export function NaturezaMatrix({ porNatureza = [] }) {
++  const { t } = useI18n();
++  const ENTIDADES = useMemo(
++    () =>
++      ENTIDADE_DEFS.map((e) => ({
++        code: e.code,
++        short: e.short,
++        label: t(e.labelKey),
++      })),
++    [t]
++  );
++  const METRICAS = useMemo(
++    () =>
++      METRICA_DEFS.map((m) => ({
++        value: m.value,
++        label: t(m.labelKey),
++      })),
++    [t]
++  );
++  const percentLocale = getFormatLang() === "en" ? "en-US" : "pt-BR";
+   const [metrica, setMetrica] = useState("valor");
+ 
+   /**
+@@ -243,7 +264,7 @@ export function NaturezaMatrix({ porNatureza = [] }) {
+ 
+   const metricaSelector = (
+     <label className="matrix-metric-select">
+-      Métrica
++      {t("municipioPage.metric")}
+       <select
+         value={metrica}
+         onChange={(event) => setMetrica(event.target.value)}
+@@ -260,12 +281,12 @@ export function NaturezaMatrix({ porNatureza = [] }) {
+   if (mesReferencia === null) {
+     return (
+       <ChartCard
+-        title="Fluxo entre Pessoas, Empresas e Governo"
+-        subtitle="Cruzamento de pagador e recebedor na dimensão Natureza."
++        title={t("transacoesPage.matrixTitle")}
++        subtitle={t("transacoesPage.matrixSubtitle")}
+         fullWidth
+       >
+         <div className="state-message">
+-          Não há dados de natureza disponíveis.
++          {t("transacoesPage.matrixNoData")}
+         </div>
+       </ChartCard>
+     );
+@@ -281,10 +302,8 @@ export function NaturezaMatrix({ porNatureza = [] }) {
+ 
+   return (
+     <ChartCard
+-      title="Fluxo entre Pessoas, Empresas e Governo"
+-      subtitle={`Quem paga (linhas) e quem recebe (colunas) em ${formatAnoMes(
+-        mesReferencia
+-      )}. Arraste o controle ou use o play para percorrer os meses. Sempre um único mês — os filtros de período da página não afetam esta matriz.`}
++      title={t("transacoesPage.matrixTitle")}
++      subtitle={t("transacoesPage.matrixSubMonth", { month: formatAnoMes(mesReferencia) })}
+       tabs={metricaSelector}
+       fullWidth
+     >
+@@ -294,7 +313,7 @@ export function NaturezaMatrix({ porNatureza = [] }) {
+             type="button"
+             className="matrix-play"
+             onClick={() => setTocando((current) => !current)}
+-            aria-label={tocando ? "Pausar" : "Reproduzir"}
++            aria-label={tocando ? t("common.pause") : t("common.play")}
+             disabled={meses.length <= 1}
+           >
+             {tocando ? "❚❚" : "►"}
+@@ -311,7 +330,7 @@ export function NaturezaMatrix({ porNatureza = [] }) {
+               setTocando(false);
+               setMesIndex(Number(event.target.value));
+             }}
+-            aria-label="Mês de referência"
++            aria-label={t("common.referenceMonth")}
+           />
+ 
+           <span className="matrix-timeline-label">
+@@ -330,9 +349,9 @@ export function NaturezaMatrix({ porNatureza = [] }) {
+           <thead>
+             <tr>
+               <th scope="col" className="natureza-matrix-corner">
+-                <span className="natureza-matrix-corner-pagador">Pagador</span>
++                <span className="natureza-matrix-corner-pagador">{t("transacoesPage.matrixPayer")}</span>
+                 <span className="natureza-matrix-corner-recebedor">
+-                  Recebedor
++                  {t("transacoesPage.matrixReceiver")}
+                 </span>
+               </th>
+               {ENTIDADES.map((coluna) => (
+@@ -369,8 +388,8 @@ export function NaturezaMatrix({ porNatureza = [] }) {
+                       {percentual !== null && (
+                         <span className="natureza-matrix-share">
+                           {percentual < 0.01 && percentual > 0
+-                            ? "<0,01%"
+-                            : `${percentual.toLocaleString("pt-BR", {
++                            ? (percentLocale === "en-US" ? "<0.01%" : "<0,01%")
++                            : `${percentual.toLocaleString(percentLocale, {
+                                 minimumFractionDigits: 2,
+                                 maximumFractionDigits: 2,
+                               })}%`}
+@@ -385,24 +404,21 @@ export function NaturezaMatrix({ porNatureza = [] }) {
+         </table>
+ 
+         <p className="natureza-matrix-note">
+-          A intensidade da cor usa escala logarítmica: as células variam por
+-          ordens de grandeza e, numa escala linear, quase todas ficariam no
+-          mesmo tom. Use os números para comparações precisas.
+-          {metrica !== "ticket" &&
+-            " Os percentuais são a participação de cada cruzamento no total do mês."}
++          {t("transacoesPage.matrixNoteLog")}
++          {metrica !== "ticket" && t("transacoesPage.matrixNoteShare")}
+         </p>
+ 
+         <p className="natureza-matrix-note">
+-          Transações sem natureza identificada na base (&ldquo;Não
+-          disponível&rdquo;) ficam fora da matriz: representam{" "}
++          {t("transacoesPage.matrixNoteOutLead")}
+           {percentualFora < 0.01
+-            ? "menos de 0,01%"
+-            : `${percentualFora.toLocaleString("pt-BR", {
++            ? t("transacoesPage.matrixLessThan")
++            : `${percentualFora.toLocaleString(percentLocale, {
+                 minimumFractionDigits: 2,
+                 maximumFractionDigits: 2,
+-              })}%`}{" "}
+-          do valor do mês ({formatNumberCompact(foraDoGrid.quantidade)}{" "}
+-          transações) e não se encaixam em nenhum par pagador–recebedor.
++              })}%`}
++          {t("transacoesPage.matrixNoteOutTail", {
++            count: formatNumberCompact(foraDoGrid.quantidade),
++          })}
+         </p>
+       </div>
+     </ChartCard>
+diff --git a/src/components/charts/transacoes/TrendChart.jsx b/src/components/charts/transacoes/TrendChart.jsx
+index c2c1a14..edc1d81 100644
+--- a/src/components/charts/transacoes/TrendChart.jsx
++++ b/src/components/charts/transacoes/TrendChart.jsx
+@@ -2,6 +2,7 @@ import { useMemo } from "react";
+ import {
+   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+ } from "recharts";
++import { useI18n } from "../../../lib/i18n/I18nContext";
+ import { ChartCard } from "../../shared/ChartCard";
+ import { ChartTooltip } from "../../shared/ChartTooltip";
+ import {
+@@ -20,14 +21,14 @@ import {
+  */
+ const METRICS = {
+   VALOR: {
+-    seriesName: "Valor transacionado",
+-    subtitle: "Valor mensal liquidado no SPI, todo o Brasil",
++    seriesKey: "transacoesPage.trendSeriesValue",
++    subtitleKey: "transacoesPage.trendSubValue",
+     compact: formatCurrencyCompact,
+     full: formatCurrencyFull,
+   },
+   QUANTIDADE: {
+-    seriesName: "Transações",
+-    subtitle: "Quantidade mensal liquidada no SPI, todo o Brasil",
++    seriesKey: "common.transactions",
++    subtitleKey: "transacoesPage.trendSubCount",
+     compact: formatNumberCompact,
+     full: formatNumberFull,
+   },
+@@ -40,6 +41,7 @@ const METRICS = {
+  * blocos mês a mês, o que casa com os demais gráficos de barra da página.
+  */
+ export function TrendChart({ mensal, start, end, metric = "VALOR" }) {
++  const { t } = useI18n();
+   const cfg = METRICS[metric] ?? METRICS.VALOR;
+ 
+   const rows = useMemo(
+@@ -53,8 +55,8 @@ export function TrendChart({ mensal, start, end, metric = "VALOR" }) {
+ 
+   return (
+     <ChartCard
+-      title="Transações Pix liquidadas por mês"
+-      subtitle={cfg.subtitle}
++      title={t("transacoesPage.trendTitle")}
++      subtitle={t(cfg.subtitleKey)}
+       fullWidth
+     >
+       <ResponsiveContainer width="100%" height={280}>
+@@ -79,7 +81,7 @@ export function TrendChart({ mensal, start, end, metric = "VALOR" }) {
+           />
+           <Bar
+             dataKey="valor"
+-            name={cfg.seriesName}
++            name={t(cfg.seriesKey)}
+             fill="var(--series-1)"
+             radius={0}
+           />
+diff --git a/src/components/shared/CsvDownloadButton.jsx b/src/components/shared/CsvDownloadButton.jsx
+index 056086e..ecc56ed 100644
+--- a/src/components/shared/CsvDownloadButton.jsx
++++ b/src/components/shared/CsvDownloadButton.jsx
+@@ -1,10 +1,13 @@
+ import { exportCsv } from "../../lib/exportCsv";
++import { useI18n } from "../../lib/i18n/I18nContext";
+ 
+ export function CsvDownloadButton({
+   data,
+   filename,
+-  label = "Baixar CSV",
++  label,
+ }) {
++  const { t } = useI18n();
++  const resolvedLabel = label ?? t("common.csvDownload");
+   const disabled = !Array.isArray(data) || data.length === 0;
+ 
+   return (
+@@ -13,10 +16,10 @@ export function CsvDownloadButton({
+       className="csv-download-button"
+       disabled={disabled}
+       onClick={() => exportCsv(filename, data)}
+-      aria-label={label}
++      aria-label={resolvedLabel}
+     >
+       <span aria-hidden="true">↓</span>
+-      <span>{label}</span>
++      <span>{resolvedLabel}</span>
+ 
+       <style>
+         {`
+diff --git a/src/components/shared/Filters.jsx b/src/components/shared/Filters.jsx
+index de4b16c..c0b839f 100644
+--- a/src/components/shared/Filters.jsx
++++ b/src/components/shared/Filters.jsx
+@@ -1,5 +1,6 @@
+ import { useMemo } from "react";
+ import { formatAnoMes } from "../../lib/format";
++import { useI18n } from "../../lib/i18n/I18nContext";
+ 
+ function yearOf(anoMes) {
+   return Math.floor(anoMes / 100);
+@@ -98,6 +99,7 @@ export function Filters({
+   layout = "row",
+   children,
+ }) {
++  const { t } = useI18n();
+   const startOptions = months.filter((m) => m <= end);
+   const endOptions = months.filter((m) => m >= start);
+ 
+@@ -110,14 +112,14 @@ export function Filters({
+     <div className="filters-row">
+       <div className={periodClass}>
+         <CascadingMonthSelect
+-          label="De"
++          label={t("common.from")}
+           value={start}
+           options={startOptions}
+           onChange={onStartChange}
+         />
+ 
+         <CascadingMonthSelect
+-          label="Até"
++          label={t("common.to")}
+           value={end}
+           options={endOptions}
+           onChange={onEndChange}
+diff --git a/src/components/shared/Glossary.jsx b/src/components/shared/Glossary.jsx
+new file mode 100644
+index 0000000..bd7e595
+--- /dev/null
++++ b/src/components/shared/Glossary.jsx
+@@ -0,0 +1,28 @@
++// src/components/shared/Glossary.jsx
++// Seção de glossário reutilizável, renderizada ao fim de cada página de
++// conteúdo. Recebe uma lista de { term, description } já no idioma ativo
++// (as definições vivem em src/lib/i18n/glossary.js) e reaproveita os estilos
++// existentes (.definitions-section) — sem estilo novo.
++
++import { useI18n } from "../../lib/i18n/I18nContext";
++
++export function Glossary({ items }) {
++  const { t } = useI18n();
++
++  if (!Array.isArray(items) || items.length === 0) return null;
++
++  return (
++    <section className="definitions-section">
++      <span className="definitions-eyebrow">{t("glossaryUi.eyebrow")}</span>
++      <h3>{t("glossaryUi.heading")}</h3>
++      <dl>
++        {items.map(({ term, description }) => (
++          <div key={term} className="definitions-item">
++            <dt>{term}</dt>
++            <dd>{description}</dd>
++          </div>
++        ))}
++      </dl>
++    </section>
++  );
++}
+diff --git a/src/components/shared/LanguageToggle.jsx b/src/components/shared/LanguageToggle.jsx
+new file mode 100644
+index 0000000..1d17547
+--- /dev/null
++++ b/src/components/shared/LanguageToggle.jsx
+@@ -0,0 +1,75 @@
++// src/components/shared/LanguageToggle.jsx
++// Alternador PT-BR / EN-US. Segmented control de dois botões: o idioma ativo
++// fica destacado. Vive no canto superior direito do cabeçalho.
++
++import { useI18n } from "../../lib/i18n/I18nContext";
++
++export function LanguageToggle() {
++  const { lang, setLang, t } = useI18n();
++
++  return (
++    <div className="lang-toggle" role="group" aria-label={t("langToggle.label")}>
++      <button
++        type="button"
++        className={`lang-toggle__btn${lang === "pt" ? " is-active" : ""}`}
++        aria-pressed={lang === "pt"}
++        aria-label={t("langToggle.toPt")}
++        onClick={() => setLang("pt")}
++      >
++        {t("langToggle.pt")}
++      </button>
++      <button
++        type="button"
++        className={`lang-toggle__btn${lang === "en" ? " is-active" : ""}`}
++        aria-pressed={lang === "en"}
++        aria-label={t("langToggle.toEn")}
++        onClick={() => setLang("en")}
++      >
++        {t("langToggle.en")}
++      </button>
++
++      <style>
++        {`
++          .lang-toggle {
++            display: inline-flex;
++            align-items: center;
++            gap: 0;
++            border: 1px solid var(--border);
++            border-radius: 8px;
++            overflow: hidden;
++            background: var(--surface-1);
++          }
++          .lang-toggle__btn {
++            appearance: none;
++            border: 0;
++            background: transparent;
++            color: var(--text-secondary);
++            font: inherit;
++            font-size: 12px;
++            font-weight: 700;
++            letter-spacing: 0.03em;
++            padding: 6px 12px;
++            min-height: 32px;
++            cursor: pointer;
++            transition: background-color 150ms ease, color 150ms ease;
++          }
++          .lang-toggle__btn + .lang-toggle__btn {
++            border-left: 1px solid var(--border);
++          }
++          .lang-toggle__btn:hover:not(.is-active) {
++            background: var(--gridline);
++            color: var(--text-primary);
++          }
++          .lang-toggle__btn.is-active {
++            background: var(--accent);
++            color: var(--accent-contrast, #fff);
++          }
++          .lang-toggle__btn:focus-visible {
++            outline: 2px solid var(--series-1);
++            outline-offset: -2px;
++          }
++        `}
++      </style>
++    </div>
++  );
++}
+diff --git a/src/components/shared/StatTile.jsx b/src/components/shared/StatTile.jsx
+index 729bf50..3f25749 100644
+--- a/src/components/shared/StatTile.jsx
++++ b/src/components/shared/StatTile.jsx
+@@ -1,11 +1,15 @@
++import { useI18n } from "../../lib/i18n/I18nContext";
++
+ export function StatTile({ label, value, delta }) {
++  const { t } = useI18n();
++
+   return (
+     <div className="stat-tile">
+       <p className="stat-label">{label}</p>
+       <p className="stat-value">{value}</p>
+       {delta != null && (
+         <p className={`stat-delta${delta >= 0 ? " positive" : ""}`}>
+-          {delta >= 0 ? "↑" : "↓"} {Math.abs(delta).toFixed(1)}% vs. mês anterior
++          {delta >= 0 ? "↑" : "↓"} {Math.abs(delta).toFixed(1)}% {t("common.vsPrevMonth")}
+         </p>
+       )}
+     </div>
+diff --git a/src/components/shared/TabNav.jsx b/src/components/shared/TabNav.jsx
+index 56996ca..393821d 100644
+--- a/src/components/shared/TabNav.jsx
++++ b/src/components/shared/TabNav.jsx
+@@ -6,8 +6,11 @@
+ import { NavLink } from "react-router-dom";
+ import { TABS } from "../../lib/tabs";
+ import { trackTabView } from "../../lib/analytics";
++import { useI18n } from "../../lib/i18n/I18nContext";
+ 
+ export function TabNav() {
++  const { t } = useI18n();
++
+   return (
+     <nav className="tab-nav">
+       {TABS.map((tab) => (
+@@ -18,7 +21,7 @@ export function TabNav() {
+           className={({ isActive }) => (isActive ? "active" : "")}
+           onClick={() => trackTabView(tab.key)}
+         >
+-          {tab.label}
++          {t(tab.labelKey)}
+         </NavLink>
+       ))}
+     </nav>
+diff --git a/src/index.css b/src/index.css
+index f97a12f..3b09875 100644
+--- a/src/index.css
++++ b/src/index.css
+@@ -144,11 +144,27 @@ input:focus {
+ }
+ 
+ .app-header {
++  position: relative;
+   margin-bottom: 18px;
+   padding-bottom: 14px;
+   border-bottom: 1px solid var(--border);
+ }
+ 
++.app-header__lang {
++  position: absolute;
++  top: 0;
++  right: 0;
++}
++
++@media (max-width: 560px) {
++  .app-header__lang {
++    position: static;
++    margin-bottom: 12px;
++    display: flex;
++    justify-content: flex-end;
++  }
++}
++
+ .app-header__title {
+   display: flex;
+   align-items: center;
+diff --git a/src/lib/categories.js b/src/lib/categories.js
+index 649e6a5..9018c84 100644
+--- a/src/lib/categories.js
++++ b/src/lib/categories.js
+@@ -26,11 +26,14 @@ function buildPalette(order) {
+ export const DIMENSIONS = {
+   porPFPJPagador: {
+     label: "Pessoa física x jurídica (pagador)",
++    labelEn: "Individual vs. business (payer)",
+     order: ["PF", "PJ", "Nao disponivel"],
+     labels: { PF: "Pessoa física", PJ: "Pessoa jurídica", "Nao disponivel": "Não disponível" },
++    labelsEn: { PF: "Individual", PJ: "Business", "Nao disponivel": "Not available" },
+   },
+   porRegiaoPagador: {
+     label: "Região do pagador",
++    labelEn: "Payer region",
+     order: ["SUDESTE", "NORDESTE", "SUL", "NORTE", "CENTRO-OESTE", "Nao informado"],
+     labels: {
+       SUDESTE: "Sudeste",
+@@ -40,9 +43,18 @@ export const DIMENSIONS = {
+       "CENTRO-OESTE": "Centro-Oeste",
+       "Nao informado": "Não informado",
+     },
++    labelsEn: {
++      SUDESTE: "Southeast",
++      NORDESTE: "Northeast",
++      SUL: "South",
++      NORTE: "North",
++      "CENTRO-OESTE": "Central-West",
++      "Nao informado": "Not reported",
++    },
+   },
+   porNatureza: {
+     label: "Natureza da transação",
++    labelEn: "Transaction nature",
+     order: ["P2P", "P2B", "B2P", "B2B", "P2G", "B2G", "G2P", "G2B", "G2G", "Nao disponivel"],
+     labels: {
+       P2P: "Pessoa → Pessoa",
+@@ -56,9 +68,22 @@ export const DIMENSIONS = {
+       G2G: "Governo → Governo",
+       "Nao disponivel": "Não disponível",
+     },
++    labelsEn: {
++      P2P: "Person → Person",
++      P2B: "Person → Business",
++      B2P: "Business → Person",
++      B2B: "Business → Business",
++      P2G: "Person → Government",
++      B2G: "Business → Government",
++      G2P: "Government → Person",
++      G2B: "Government → Business",
++      G2G: "Government → Government",
++      "Nao disponivel": "Not available",
++    },
+   },
+   porFinalidade: {
+     label: "Finalidade",
++    labelEn: "Purpose",
+     order: ["Pix", "Pix Saque", "Pix Troco", "Nao disponivel"],
+     labels: {
+       Pix: "Transferência",
+@@ -66,9 +91,16 @@ export const DIMENSIONS = {
+       "Pix Troco": "Troco",
+       "Nao disponivel": "Não disponível",
+     },
++    labelsEn: {
++      Pix: "Transfer",
++      "Pix Saque": "Withdrawal",
++      "Pix Troco": "Cash back",
++      "Nao disponivel": "Not available",
++    },
+   },
+   porFormaIniciacao: {
+     label: "Forma de iniciação",
++    labelEn: "Initiation method",
+     order: ["DICT", "QRES", "QRDN", "MANU", "INIC", "AUTO", "APDN", "APES", "Nao disponivel"],
+     labels: {
+       DICT: "Chave Pix",
+@@ -81,6 +113,17 @@ export const DIMENSIONS = {
+       APES: "Aproximação estática",
+       "Nao disponivel": "Não disponível",
+     },
++    labelsEn: {
++      DICT: "Pix key",
++      QRES: "Static QR code",
++      QRDN: "Dynamic QR code",
++      MANU: "Manual entry",
++      INIC: "Payment initiator",
++      AUTO: "Automatic Pix",
++      APDN: "Contactless",
++      APES: "Static contactless",
++      "Nao disponivel": "Not available",
++    },
+   },
+ };
+ 
+@@ -109,8 +152,17 @@ DIMENSIONS.porNatureza.colors = {
+   "Nao disponivel": MUTED,
+ };
+ 
+-export function categoryLabel(dimensionKey, categoria) {
+-  return DIMENSIONS[dimensionKey]?.labels[categoria] ?? categoria;
++export function categoryLabel(dimensionKey, categoria, lang = "pt") {
++  const dim = DIMENSIONS[dimensionKey];
++  if (!dim) return categoria;
++  const table = lang === "en" ? dim.labelsEn ?? dim.labels : dim.labels;
++  return table[categoria] ?? dim.labels[categoria] ?? categoria;
++}
++
++export function dimensionLabel(dimensionKey, lang = "pt") {
++  const dim = DIMENSIONS[dimensionKey];
++  if (!dim) return dimensionKey;
++  return lang === "en" ? dim.labelEn ?? dim.label : dim.label;
+ }
+ 
+ export function categoryColor(dimensionKey, categoria) {
+diff --git a/src/lib/format.js b/src/lib/format.js
+index 6c4a4f6..f7797e6 100644
+--- a/src/lib/format.js
++++ b/src/lib/format.js
+@@ -1,46 +1,75 @@
+-const currencyCompact = new Intl.NumberFormat("pt-BR", {
+-  style: "currency",
+-  currency: "BRL",
+-  notation: "compact",
+-  maximumFractionDigits: 1,
+-});
++// src/lib/format.js
++// Formatação de números, moeda e datas sensível ao idioma.
++//
++// O idioma ativo é guardado em estado de módulo e atualizado por
++// `setFormatLocale(lang)`, chamado pelo I18nProvider sempre que o idioma muda.
++// Assim, todos os call sites existentes (formatCurrencyCompact(x), etc.)
++// continuam funcionando sem mudança de assinatura, mas passam a respeitar o
++// idioma. A moeda permanece BRL nos dois idiomas (o dado é em reais); só o
++// locale de agrupamento/notação muda.
+ 
+-const numberCompact = new Intl.NumberFormat("pt-BR", {
+-  notation: "compact",
+-  maximumFractionDigits: 1,
+-});
++const LOCALES = { pt: "pt-BR", en: "en-US" };
+ 
+-const numberFull = new Intl.NumberFormat("pt-BR");
++let currentLang = "pt";
+ 
+-const currencyFull = new Intl.NumberFormat("pt-BR", {
+-  style: "currency",
+-  currency: "BRL",
+-});
++const formatters = buildFormatters("pt-BR");
++
++function buildFormatters(locale) {
++  return {
++    currencyCompact: new Intl.NumberFormat(locale, {
++      style: "currency",
++      currency: "BRL",
++      notation: "compact",
++      maximumFractionDigits: 1,
++    }),
++    numberCompact: new Intl.NumberFormat(locale, {
++      notation: "compact",
++      maximumFractionDigits: 1,
++    }),
++    numberFull: new Intl.NumberFormat(locale),
++    currencyFull: new Intl.NumberFormat(locale, {
++      style: "currency",
++      currency: "BRL",
++    }),
++  };
++}
++
++/** Chamado pelo I18nProvider quando o idioma muda. */
++export function setFormatLocale(lang) {
++  currentLang = lang === "en" ? "en" : "pt";
++  const locale = LOCALES[currentLang];
++  Object.assign(formatters, buildFormatters(locale));
++}
++
++export function getFormatLang() {
++  return currentLang;
++}
+ 
+ export function formatCurrencyCompact(value) {
+-  return currencyCompact.format(value);
++  return formatters.currencyCompact.format(value);
+ }
+ 
+ export function formatNumberCompact(value) {
+-  return numberCompact.format(value);
++  return formatters.numberCompact.format(value);
+ }
+ 
+ export function formatNumberFull(value) {
+-  return numberFull.format(value);
++  return formatters.numberFull.format(value);
+ }
+ 
+ export function formatCurrencyFull(value) {
+-  return currencyFull.format(value);
++  return formatters.currencyFull.format(value);
+ }
+ 
+-const MONTHS = [
+-  "jan", "fev", "mar", "abr", "mai", "jun",
+-  "jul", "ago", "set", "out", "nov", "dez",
+-];
++const MONTHS = {
++  pt: ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"],
++  en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
++};
+ 
+-// AnoMes no formato AAAAMM (ex.: 202505) -> "mai/25"
++// AnoMes no formato AAAAMM (ex.: 202505) -> "mai/25" (pt) ou "May/25" (en)
+ export function formatAnoMes(anoMes) {
+   const year = Math.floor(anoMes / 100);
+   const month = anoMes % 100;
+-  return `${MONTHS[month - 1]}/${String(year).slice(2)}`;
++  const names = MONTHS[currentLang] ?? MONTHS.pt;
++  return `${names[month - 1]}/${String(year).slice(2)}`;
+ }
+diff --git a/src/lib/i18n/I18nContext.jsx b/src/lib/i18n/I18nContext.jsx
+new file mode 100644
+index 0000000..faf1f8d
+--- /dev/null
++++ b/src/lib/i18n/I18nContext.jsx
+@@ -0,0 +1,118 @@
++// src/lib/i18n/I18nContext.jsx
++// Núcleo de internacionalização. Mantém o idioma ativo (pt/en), persiste a
++// escolha em localStorage, sincroniza <html lang> e expõe uma função `t()`.
++//
++// Decisão de arquitetura: é um toggle de UI puro — o idioma NÃO vive na URL.
++// A mesma rota (/usuarios, /chaves, ...) serve os dois idiomas; só o texto
++// renderizado muda. Isso mantém o roteamento e o SEO existentes intactos.
++
++import {
++  createContext,
++  useCallback,
++  useContext,
++  useEffect,
++  useMemo,
++  useState,
++} from "react";
++import { messages } from "./messages";
++import { setFormatLocale } from "../format";
++
++const STORAGE_KEY = "pix-dataviz-lang";
++const DEFAULT_LANG = "pt";
++const SUPPORTED = ["pt", "en"];
++
++const I18nContext = createContext(null);
++
++/** Lê a preferência salva; cai no padrão se ausente ou inválida. */
++function readInitialLang() {
++  if (typeof window === "undefined") return DEFAULT_LANG;
++
++  const stored = window.localStorage.getItem(STORAGE_KEY);
++  if (stored && SUPPORTED.includes(stored)) return stored;
++
++  // Detecção suave pelo idioma do navegador na primeira visita.
++  const nav = window.navigator?.language ?? "";
++  if (nav.toLowerCase().startsWith("en")) return "en";
++
++  return DEFAULT_LANG;
++}
++
++/**
++ * Resolve uma chave "a.b.c" no dicionário do idioma ativo.
++ * Cai no português e, por fim, na própria chave — nunca quebra o render.
++ */
++function resolve(lang, key) {
++  const fromLang = getPath(messages[lang], key);
++  if (fromLang !== undefined) return fromLang;
++
++  const fromDefault = getPath(messages[DEFAULT_LANG], key);
++  if (fromDefault !== undefined) return fromDefault;
++
++  return key;
++}
++
++function getPath(obj, key) {
++  return key.split(".").reduce((acc, part) => {
++    if (acc && typeof acc === "object" && part in acc) return acc[part];
++    return undefined;
++  }, obj);
++}
++
++/** Interpola {placeholders} numa string com valores de `vars`. */
++function interpolate(template, vars) {
++  if (typeof template !== "string" || !vars) return template;
++  return template.replace(/\{(\w+)\}/g, (match, name) =>
++    name in vars ? String(vars[name]) : match
++  );
++}
++
++export function I18nProvider({ children }) {
++  const [lang, setLangState] = useState(() => {
++    const initial = readInitialLang();
++    // Sincroniza os formatadores antes do primeiro render, para que datas e
++    // números já saiam no locale correto na carga inicial.
++    setFormatLocale(initial);
++    return initial;
++  });
++
++  useEffect(() => {
++    setFormatLocale(lang);
++  }, [lang]);
++
++  useEffect(() => {
++    if (typeof document !== "undefined") {
++      document.documentElement.lang = lang === "en" ? "en" : "pt-BR";
++    }
++    if (typeof window !== "undefined") {
++      window.localStorage.setItem(STORAGE_KEY, lang);
++    }
++  }, [lang]);
++
++  const setLang = useCallback((next) => {
++    if (SUPPORTED.includes(next)) setLangState(next);
++  }, []);
++
++  const toggleLang = useCallback(() => {
++    setLangState((prev) => (prev === "pt" ? "en" : "pt"));
++  }, []);
++
++  const t = useCallback(
++    (key, vars) => interpolate(resolve(lang, key), vars),
++    [lang]
++  );
++
++  const value = useMemo(
++    () => ({ lang, setLang, toggleLang, t }),
++    [lang, setLang, toggleLang, t]
++  );
++
++  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
++}
++
++export function useI18n() {
++  const ctx = useContext(I18nContext);
++  if (!ctx) {
++    throw new Error("useI18n precisa estar dentro de <I18nProvider>");
++  }
++  return ctx;
++}
+diff --git a/src/lib/i18n/glossary.js b/src/lib/i18n/glossary.js
+new file mode 100644
+index 0000000..fc5d567
+--- /dev/null
++++ b/src/lib/i18n/glossary.js
+@@ -0,0 +1,242 @@
++// src/lib/i18n/glossary.js
++// Definições do glossário por página, nos dois idiomas. `getGlossary(page, lang)`
++// devolve a lista { term, description } pronta para o componente <Glossary>.
++//
++// Páginas cobertas: dict, chaves, municipio, transacoes (a Visão geral é uma
++// landing não técnica e não recebe glossário).
++
++const GLOSSARY = {
++  dict: {
++    pt: [
++      {
++        term: "DICT (Diretório de Identificadores de Contas Transacionais)",
++        description:
++          "Base de dados mantida pelo Banco Central que armazena o vínculo entre as chaves Pix e as contas transacionais dos usuários recebedores. É o componente do arranjo Pix que permite localizar a conta de destino a partir de uma chave, dispensando a troca manual de dados bancários.",
++      },
++      {
++        term: "Usuário cadastrado no DICT",
++        description:
++          "Pessoa física ou jurídica que possui ao menos uma chave Pix registrada no DICT, vinculada a uma conta transacional em uma instituição participante do Pix.",
++      },
++      {
++        term: "Pessoa física (PF)",
++        description:
++          "Usuários cadastrados no DICT identificados por CPF, ou que tenham vinculado ao menos uma chave (CPF, e-mail, celular ou chave aleatória) a uma conta de titularidade individual.",
++      },
++      {
++        term: "Pessoa jurídica (PJ)",
++        description:
++          "Usuários cadastrados no DICT identificados por CNPJ, vinculados a contas transacionais de empresas ou outras entidades jurídicas.",
++      },
++      {
++        term: "Chave Pix",
++        description:
++          "Apelido cadastrado no DICT (CPF/CNPJ, e-mail, número de celular ou chave aleatória) que identifica uma conta transacional específica, usado para iniciar pagamentos sem a necessidade de informar dados bancários completos.",
++      },
++    ],
++    en: [
++      {
++        term: "DICT (Directory of Transactional Account Identifiers)",
++        description:
++          "A database maintained by the Central Bank that stores the link between Pix keys and the transactional accounts of receiving users. It is the component of the Pix scheme that lets a destination account be located from a key, removing the need to exchange banking details manually.",
++      },
++      {
++        term: "User registered in the DICT",
++        description:
++          "An individual or business that holds at least one Pix key registered in the DICT, linked to a transactional account at a Pix-participating institution.",
++      },
++      {
++        term: "Individual (PF)",
++        description:
++          "Users registered in the DICT identified by CPF (individual taxpayer ID), or who have linked at least one key (CPF, email, phone, or random key) to a personally held account.",
++      },
++      {
++        term: "Business (PJ)",
++        description:
++          "Users registered in the DICT identified by CNPJ (business taxpayer ID), linked to transactional accounts of companies or other legal entities.",
++      },
++      {
++        term: "Pix key",
++        description:
++          "An alias registered in the DICT (CPF/CNPJ, email, phone number, or random key) that identifies a specific transactional account, used to initiate payments without providing full banking details.",
++      },
++    ],
++  },
++
++  chaves: {
++    pt: [
++      {
++        term: "Chave Pix",
++        description:
++          "Apelido que identifica uma conta transacional no DICT. Pode ser CPF, CNPJ, e-mail, número de celular ou uma chave aleatória gerada pelo sistema. Cada conta pode ter mais de uma chave, respeitados os limites por titular.",
++      },
++      {
++        term: "Estoque de chaves",
++        description:
++          "Quantidade total de chaves Pix ativas registradas no DICT em um dado mês. É uma foto do acumulado, não um fluxo — reflete cadastros menos exclusões até a data de referência.",
++      },
++      {
++        term: "Participante",
++        description:
++          "Instituição financeira ou de pagamento autorizada pelo Banco Central a oferecer o Pix e a registrar chaves no DICT em nome de seus clientes.",
++      },
++      {
++        term: "Pessoa física (PF) / Pessoa jurídica (PJ)",
++        description:
++          "Classificação da titularidade da chave: PF corresponde a chaves de contas de pessoas físicas (identificadas por CPF); PJ, a chaves de contas de empresas e demais entidades (identificadas por CNPJ).",
++      },
++      {
++        term: "Top 10 participantes",
++        description:
++          "Recorte dos dez maiores participantes por estoque de chaves no último mês disponível, usado para acompanhar a concentração e a evolução relativa das instituições ao longo do tempo.",
++      },
++    ],
++    en: [
++      {
++        term: "Pix key",
++        description:
++          "An alias that identifies a transactional account in the DICT. It can be a CPF, CNPJ, email, phone number, or a system-generated random key. Each account may hold more than one key, subject to per-holder limits.",
++      },
++      {
++        term: "Key stock",
++        description:
++          "The total number of active Pix keys registered in the DICT in a given month. It is a snapshot of the cumulative total, not a flow — it reflects registrations minus deletions up to the reference date.",
++      },
++      {
++        term: "Participant",
++        description:
++          "A financial or payment institution authorized by the Central Bank to offer Pix and to register keys in the DICT on behalf of its customers.",
++      },
++      {
++        term: "Individual (PF) / Business (PJ)",
++        description:
++          "Classification of key ownership: PF corresponds to keys on individuals' accounts (identified by CPF); PJ to keys on accounts of companies and other entities (identified by CNPJ).",
++      },
++      {
++        term: "Top 10 participants",
++        description:
++          "A cut of the ten largest participants by key stock in the latest available month, used to track concentration and the relative evolution of institutions over time.",
++      },
++    ],
++  },
++
++  municipio: {
++    pt: [
++      {
++        term: "Município (código IBGE)",
++        description:
++          "Unidade territorial de referência do dado. Cada município é identificado pelo seu código do IBGE, evitando ambiguidade entre municípios de mesmo nome em estados diferentes.",
++      },
++      {
++        term: "Região",
++        description:
++          "Agrupamento das cinco grandes regiões do IBGE (Norte, Nordeste, Centro-Oeste, Sudeste e Sul), obtido pela agregação dos municípios de cada estado.",
++      },
++      {
++        term: "Valor transacionado",
++        description:
++          "Soma, em reais, do valor das transações Pix liquidadas cujo pagador ou recebedor está no recorte geográfico selecionado, no período escolhido.",
++      },
++      {
++        term: "Transações liquidadas",
++        description:
++          "Quantidade de transações Pix efetivamente concluídas no período, independentemente do valor. Complementa o valor transacionado para distinguir volume de ticket.",
++      },
++      {
++        term: "Ranking",
++        description:
++          "Ordenação de municípios ou estados por valor ou por quantidade de transações, permitindo comparar a intensidade de uso do Pix entre localidades.",
++      },
++    ],
++    en: [
++      {
++        term: "Municipality (IBGE code)",
++        description:
++          "The territorial reference unit of the data. Each municipality is identified by its IBGE code, avoiding ambiguity between municipalities with the same name in different states.",
++      },
++      {
++        term: "Region",
++        description:
++          "Grouping into the five major IBGE regions (North, Northeast, Central-West, Southeast, and South), obtained by aggregating each state's municipalities.",
++      },
++      {
++        term: "Transacted value",
++        description:
++          "The sum, in Brazilian reais, of the value of settled Pix transactions whose payer or receiver is in the selected geographic cut, over the chosen period.",
++      },
++      {
++        term: "Settled transactions",
++        description:
++          "The number of Pix transactions actually completed in the period, regardless of amount. It complements transacted value to separate volume from ticket size.",
++      },
++      {
++        term: "Ranking",
++        description:
++          "Ordering of municipalities or states by value or by transaction count, allowing comparison of Pix usage intensity across locations.",
++      },
++    ],
++  },
++
++  transacoes: {
++    pt: [
++      {
++        term: "Natureza da transação",
++        description:
++          "Classificação do par pagador → recebedor por tipo de agente: P (pessoa), B (empresa/business) e G (governo). Assim, P2P é pessoa para pessoa, P2B é pessoa para empresa, e assim por diante.",
++      },
++      {
++        term: "Finalidade",
++        description:
++          "Objetivo da operação: transferência comum, Pix Saque (retirada de dinheiro em espécie) ou Pix Troco (troco recebido em espécie numa compra).",
++      },
++      {
++        term: "Forma de iniciação",
++        description:
++          "Como o pagamento foi disparado: chave Pix (DICT), QR Code estático ou dinâmico, inserção manual de dados, iniciador de pagamento, Pix automático ou aproximação.",
++      },
++      {
++        term: "Região do pagador",
++        description:
++          "Grande região do IBGE em que está o pagador da transação, usada para compor a distribuição geográfica do fluxo.",
++      },
++      {
++        term: "Ticket médio",
++        description:
++          "Valor transacionado dividido pela quantidade de transações no período. Indica o tamanho típico de uma transação, distinguindo muitas operações pequenas de poucas operações grandes.",
++      },
++    ],
++    en: [
++      {
++        term: "Transaction nature",
++        description:
++          "Classification of the payer → receiver pair by agent type: P (person), B (business), and G (government). So P2P is person to person, P2B is person to business, and so on.",
++      },
++      {
++        term: "Purpose",
++        description:
++          "The goal of the operation: an ordinary transfer, Pix Withdrawal (cash withdrawal), or Pix Cash back (change received in cash during a purchase).",
++      },
++      {
++        term: "Initiation method",
++        description:
++          "How the payment was triggered: Pix key (DICT), static or dynamic QR code, manual data entry, payment initiator, automatic Pix, or contactless.",
++      },
++      {
++        term: "Payer region",
++        description:
++          "The major IBGE region where the transaction's payer is located, used to build the geographic distribution of the flow.",
++      },
++      {
++        term: "Average ticket",
++        description:
++          "Transacted value divided by the number of transactions in the period. It indicates the typical size of a transaction, distinguishing many small operations from a few large ones.",
++      },
++    ],
++  },
++};
++
++export function getGlossary(page, lang) {
++  const entry = GLOSSARY[page];
++  if (!entry) return [];
++  return entry[lang] ?? entry.pt ?? [];
++}
+diff --git a/src/lib/i18n/messages.js b/src/lib/i18n/messages.js
+new file mode 100644
+index 0000000..07a03f6
+--- /dev/null
++++ b/src/lib/i18n/messages.js
+@@ -0,0 +1,498 @@
++// src/lib/i18n/messages.js
++// Dicionário PT/EN. Estrutura espelhada: toda chave que existe em `pt` existe
++// em `en`. Chaves organizadas por área (header, nav, common, charts, pages,
++// glossary). O português é a fonte de verdade; se uma chave faltar em `en`,
++// o resolver cai no português automaticamente.
++
++export const messages = {
++  pt: {
++    header: {
++      title: "Dados do Pix",
++      subtitle:
++        "Visualizações interativas do Pix a partir dos dados abertos do Banco Central do Brasil. Snapshot gerado em {date}.",
++      author: "Projeto independente por",
++      disclaimer: "Não é um serviço oficial do Banco Central.",
++    },
++    langToggle: {
++      label: "Idioma",
++      pt: "PT",
++      en: "EN",
++      toPt: "Mudar para português",
++      toEn: "Switch to English",
++    },
++    nav: {
++      overview: "Visão geral",
++      dict: "Usuários",
++      chaves: "Chaves",
++      municipio: "Transações por Município",
++      transacoes: "Estatísticas de Transações",
++    },
++    state: {
++      loading: "Carregando dados do Pix...",
++      error:
++        "Não foi possível carregar os dados locais. Rode {command} e recarregue a página.",
++    },
++    footer: {
++      source: "Fonte: API pública de",
++      sourceName: "Dados Abertos do Banco Central do Brasil",
++      code: "Código-fonte disponível no",
++      github: "GitHub",
++    },
++    common: {
++      csvDownload: "Baixar CSV",
++      from: "De",
++      to: "Até",
++      metric: "Métrica",
++      view: "Visão",
++      dimension: "Dimensão",
++      referenceMonth: "Mês de referência",
++      latestMonth: "último mês disponível",
++      position: "Posição",
++      municipality: "Município",
++      value: "Valor",
++      valueBRL: "Valor (R$)",
++      transactions: "Transações",
++      keyCount: "Número de chaves",
++      vsPrevMonth: "vs. mês anterior",
++      allRegions: "Todas as regiões",
++      searchMunicipality: "Buscar município...",
++      play: "Reproduzir",
++      pause: "Pausar",
++      brasilScope:
++        " Brasil inteiro — não é afetado pelos filtros de região, estado e município.",
++    },
++    regions: {
++      NORTE: "Norte",
++      NORDESTE: "Nordeste",
++      "CENTRO-OESTE": "Centro-Oeste",
++      SUDESTE: "Sudeste",
++      SUL: "Sul",
++    },
++    pfpj: {
++      pf: "Pessoa física",
++      pj: "Pessoa jurídica",
++      pfShort: "PF",
++      pjShort: "PJ",
++    },
++    overview: {
++      eyebrow: "Visão geral",
++      heading: "O que você encontra neste painel",
++      intro1:
++        "Este é um projeto independente que reúne, em um só lugar, as principais estatísticas públicas do Pix divulgadas pelo Banco Central do Brasil. Os números vêm da API de dados abertos do BC, mas as visualizações, os recortes e a interface são de autoria própria — não se trata de um canal oficial do Banco Central.",
++      intro2:
++        "Os dados são servidos como um snapshot estático, gerado periodicamente a partir da API. Cada aba abaixo corresponde a um conjunto de dados diferente. Comece pela pergunta que você quer responder.",
++      resources: {
++        dict: {
++          question: "Quantas pessoas e empresas já têm Pix?",
++          description:
++            "Estoque mensal de usuários pessoa física e jurídica cadastrados no DICT - o diretório que vincula chaves Pix a contas transacionais. Mostra a adoção do Pix ao longo do tempo, desde 2020.",
++        },
++        chaves: {
++          question: "Quantas chaves Pix existem e onde estão?",
++          description:
++            "Estoque de chaves Pix registradas no DICT (CPF/CNPJ, e-mail, celular e chave aleatória), com a evolução histórica e a distribuição entre as instituições participantes do arranjo.",
++        },
++        municipio: {
++          question: "Como o Pix se distribui pelo território?",
++          description:
++            "Valor e quantidade de transações Pix agregados por estado e região, a partir do dado bruto por município. Permite comparar a intensidade de uso do Pix entre as unidades da federação.",
++        },
++        transacoes: {
++          question: "Quanto e como o Pix movimenta por mês?",
++          description:
++            "Total mensal de valor e quantidade de transações, com a composição por natureza, finalidade, forma de iniciação, região e tipo de pagador (PF/PJ). É a visão macro do fluxo do Pix.",
++        },
++      },
++    },
++    dictPage: {
++      kpiTotal: "Usuários cadastrados no DICT ({month})",
++      kpiPf: "Pessoa física ({month})",
++      kpiPj: "Pessoa jurídica ({month})",
++      chartTitle: "Usuários cadastrados no DICT",
++      chartSubtitle:
++        "Evolução mensal de pessoas físicas e jurídicas desde o lançamento do Pix",
++    },
++    chavesPage: {
++      kpiTotal: "Total de chaves Pix ({month})",
++      kpiPf: "Chaves de pessoa física ({month})",
++      kpiPj: "Chaves de pessoa jurídica ({month})",
++      historicoTitle: "Evolução das chaves Pix cadastradas",
++      historicoSubtitle: "Estoque mensal de chaves de pessoas físicas e jurídicas",
++      porParticipanteTitle: "Distribuição de chaves por participante",
++      serieTitle: "Evolução das chaves por participante (Top 10)",
++      serieSubtitle:
++        "Série histórica dos 10 maiores participantes por tipo de usuário, ranqueados pelo estoque no último mês",
++      topTitle: "Top {n} participantes por chaves Pix cadastradas",
++      topSubtitle:
++        "Estoque em {date}, com rankings separados para pessoas físicas e jurídicas",
++      exportType: "Tipo",
++      exportMonth: "Mês",
++      exportParticipant: "Participante",
++      exportKeys: "Chaves",
++      keyAxisLabel: "Número de chaves cadastradas",
++    },
++    municipioPage: {
++      kpiValue: "Valor transacionado ({month})",
++      kpiCount: "Transações liquidadas ({month})",
++      rankingMunicipioTitle: "Ranking de municípios",
++      rankingStateTitle: "Ranking de estados",
++      rankTopStates: "Top {n} estados por {metric} {perspective}",
++      rankTopMunicipios: "Top {n} municípios por {metric} {perspective}",
++      rankStateSelected: "{metric} {perspective} no estado selecionado",
++      rankSubPeriod: "{segment}, perspectiva {perspective}, no período filtrado.{scope}",
++      rankSubPeople:
++        "{segment}, perspectiva {perspective}. Pessoas distintas em {month}, último mês do intervalo — contagens mensais não se somam ao longo do período.{scope}",
++      colPosition: "Posição",
++      colState: "Estado",
++      colMunicipality: "Município",
++      seriesValue: "Valor",
++      seriesTransactions: "Transações",
++      seriesPeople: "Pessoas",
++      metricValor: "valor",
++      metricTransacoes: "transações",
++      metricPessoas: "pessoas",
++      regiaoTitle: "Resumo por região",
++      serieTitle: "Série mensal do município selecionado",
++      filterHint: "Todos os filtros afetam os cards e gráficos da página.",
++      perspective: "Perspectiva",
++      segment: "Segmento",
++      region: "Região",
++      state: "Estado",
++      selectState: "Selecione o estado",
++      loadingState: "Carregando dados do estado...",
++      errorState: "Falha ao carregar dados do estado.",
++      errorIndex: "Falha ao carregar lista de municípios.",
++      payer: "Pagador",
++      receiver: "Recebedor",
++      paid: "pago",
++      received: "recebido",
++      viewValue: "Valor",
++      viewTransactions: "Transações",
++      viewPeople: "Pessoas",
++      segAll: "PF + PJ",
++      segPf: "Pessoa Física",
++      segPj: "Pessoa Jurídica",
++      peopleNote:
++        "Pessoas conta usuários distintos em cada mês, alocados ao município do domicílio bancário. As contagens não se acumulam ao longo do tempo: o card principal e os rankings usam o último mês do intervalo como referência.",
++      cardPeople: "Pessoas — {perspective}{month}",
++      cardPeopleMonth: " em {month}",
++      cardTotalPeriod: "{view} {perspective} no período",
++      cardMonthlyAvg: "{view} médio mensal",
++      cardTicket: "Ticket médio",
++      metric: "Métrica",
++      regiaoValorPago: "Valor pago",
++      regiaoValorRecebido: "Valor recebido",
++      regiaoTransacoesPagas: "Transações pagas",
++      regiaoTransacoesRecebidas: "Transações recebidas",
++      regiaoPessoasPagadoras: "Pessoas pagadoras",
++      regiaoPessoasRecebedoras: "Pessoas recebedoras",
++      regiaoFallbackTitle: "Série histórica",
++      regiaoScopeBrasil: "Brasil (todos os estados)",
++      regiaoChartTitle: "{metric}, mês a mês: {scope}",
++      regiaoSubPeople:
++        "Pessoas distintas de {segment} em cada mês, atualizada conforme todos os filtros da página. As barras não se acumulam: quem transaciona em vários meses é contado em cada um deles.",
++      regiaoSubDefault:
++        "Soma mensal de {segment}, atualizada conforme todos os filtros da página.",
++    },
++    transacoesPage: {
++      kpiValue: "Valor transacionado ({month})",
++      kpiCount: "Transações liquidadas ({month})",
++      kpiTicket: "Ticket médio",
++      filterHint: "Todos os filtros afetam os gráficos de volume e categorias abaixo.",
++      trendTitle: "Transações Pix liquidadas por mês",
++      trendSeriesValue: "Valor transacionado",
++      trendSubValue: "Valor mensal liquidado no SPI, todo o Brasil",
++      trendSubCount: "Quantidade mensal liquidada no SPI, todo o Brasil",
++      breakdownAbsoluteTitle: "Composição por categoria",
++      breakdownShareTitle: "Composição por categoria (%)",
++      breakdownValueTitle: "Valor por categoria",
++      breakdownMetricValue: "valor transacionado",
++      breakdownMetricCount: "transações liquidadas",
++      breakdownSubShare:
++        "Participação de cada categoria no {metric} de cada mês. Cada barra soma 100%.",
++      breakdownSubAbsolute:
++        "Composição mensal do {metric}, por dimensão selecionada.",
++      breakdownShareHint: " Os percentuais são a participação de cada cruzamento no total do mês.",
++      matrixTitle: "Matriz de natureza (pagador × recebedor)",
++      matrixSubtitle: "Cruzamento de pagador e recebedor na dimensão Natureza.",
++      matrixPaid: "Transações pagas",
++      matrixReceived: "Transações recebidas",
++      matrixEntityPeople: "Pessoas",
++      matrixEntityBusiness: "Empresas",
++      matrixEntityGovernment: "Governo",
++      matrixMetricValue: "Valor (R$)",
++      matrixMetricCount: "Transações",
++      matrixMetricTicket: "Ticket médio",
++      matrixNoData: "Não há dados de natureza disponíveis.",
++      matrixSubMonth:
++        "Quem paga (linhas) e quem recebe (colunas) em {month}. Arraste o controle ou use o play para percorrer os meses. Sempre um único mês — os filtros de período da página não afetam esta matriz.",
++      matrixPayer: "Pagador",
++      matrixReceiver: "Recebedor",
++      matrixNoteLog:
++        "A intensidade da cor usa escala logarítmica: as células variam por ordens de grandeza e, numa escala linear, quase todas ficariam no mesmo tom. Use os números para comparações precisas.",
++      matrixNoteShare:
++        " Os percentuais são a participação de cada cruzamento no total do mês.",
++      matrixNoteOutLead: "Transações sem natureza identificada na base (“Não disponível”) ficam fora da matriz: representam ",
++      matrixNoteOutTail: " do valor do mês ({count} transações) e não se encaixam em nenhum par pagador–recebedor.",
++      matrixLessThan: "menos de 0,01%",
++      brasilNote:
++        " Brasil inteiro — não é afetado pelos filtros de região, estado e município.",
++    },
++    dimensions: {
++      porPFPJPagador: "Pessoa física x jurídica (pagador)",
++      porRegiaoPagador: "Região do pagador",
++      porNatureza: "Natureza da transação",
++      porFinalidade: "Finalidade",
++      porFormaIniciacao: "Forma de iniciação",
++    },
++    glossaryUi: {
++      eyebrow: "Glossário",
++      heading: "Definições",
++    },
++  },
++
++  en: {
++    header: {
++      title: "Pix Data",
++      subtitle:
++        "Interactive Pix visualizations built from the Central Bank of Brazil's open data. Snapshot generated on {date}.",
++      author: "Independent project by",
++      disclaimer: "Not an official Central Bank service.",
++    },
++    langToggle: {
++      label: "Language",
++      pt: "PT",
++      en: "EN",
++      toPt: "Mudar para português",
++      toEn: "Switch to English",
++    },
++    nav: {
++      overview: "Overview",
++      dict: "Users",
++      chaves: "Keys",
++      municipio: "Transactions by Municipality",
++      transacoes: "Transaction Statistics",
++    },
++    state: {
++      loading: "Loading Pix data...",
++      error: "Could not load local data. Run {command} and reload the page.",
++    },
++    footer: {
++      source: "Source: public API of",
++      sourceName: "Open Data of the Central Bank of Brazil",
++      code: "Source code available on",
++      github: "GitHub",
++    },
++    common: {
++      csvDownload: "Download CSV",
++      from: "From",
++      to: "To",
++      metric: "Metric",
++      view: "View",
++      dimension: "Dimension",
++      referenceMonth: "Reference month",
++      latestMonth: "latest available month",
++      position: "Rank",
++      municipality: "Municipality",
++      value: "Amount",
++      valueBRL: "Amount (R$)",
++      transactions: "Transactions",
++      keyCount: "Number of keys",
++      vsPrevMonth: "vs. previous month",
++      allRegions: "All regions",
++      searchMunicipality: "Search municipality...",
++      play: "Play",
++      pause: "Pause",
++      brasilScope:
++        " Whole of Brazil — not affected by the region, state, and municipality filters.",
++    },
++    regions: {
++      NORTE: "North",
++      NORDESTE: "Northeast",
++      "CENTRO-OESTE": "Central-West",
++      SUDESTE: "Southeast",
++      SUL: "South",
++    },
++    pfpj: {
++      pf: "Individual",
++      pj: "Business",
++      pfShort: "Ind.",
++      pjShort: "Bus.",
++    },
++    overview: {
++      eyebrow: "Overview",
++      heading: "What you'll find in this dashboard",
++      intro1:
++        "This is an independent project that brings together, in one place, the main public Pix statistics released by the Central Bank of Brazil. The figures come from the Central Bank's open-data API, but the visualizations, breakdowns, and interface are original work — this is not an official Central Bank channel.",
++      intro2:
++        "The data is served as a static snapshot, generated periodically from the API. Each tab below corresponds to a different dataset. Start with the question you want to answer.",
++      resources: {
++        dict: {
++          question: "How many people and businesses already use Pix?",
++          description:
++            "Monthly stock of individual and business users registered in the DICT — the directory that links Pix keys to transactional accounts. It shows Pix adoption over time, since 2020.",
++        },
++        chaves: {
++          question: "How many Pix keys exist and where are they?",
++          description:
++            "Stock of Pix keys registered in the DICT (CPF/CNPJ, email, phone, and random key), with historical evolution and the distribution across participating institutions.",
++        },
++        municipio: {
++          question: "How is Pix distributed across the country?",
++          description:
++            "Value and volume of Pix transactions aggregated by state and region, derived from the raw per-municipality data. It lets you compare Pix usage intensity across the federal units.",
++        },
++        transacoes: {
++          question: "How much and how does Pix move each month?",
++          description:
++            "Monthly totals of value and transaction volume, broken down by nature, purpose, initiation method, region, and payer type (individual/business). This is the macro view of the Pix flow.",
++        },
++      },
++    },
++    dictPage: {
++      kpiTotal: "Users registered in the DICT ({month})",
++      kpiPf: "Individuals ({month})",
++      kpiPj: "Businesses ({month})",
++      chartTitle: "Users registered in the DICT",
++      chartSubtitle:
++        "Monthly evolution of individuals and businesses since the Pix launch",
++    },
++    chavesPage: {
++      kpiTotal: "Total Pix keys ({month})",
++      kpiPf: "Individual keys ({month})",
++      kpiPj: "Business keys ({month})",
++      historicoTitle: "Evolution of registered Pix keys",
++      historicoSubtitle: "Monthly stock of individual and business keys",
++      porParticipanteTitle: "Key distribution by participant",
++      serieTitle: "Evolution of keys by participant (Top 10)",
++      serieSubtitle:
++        "Historical series of the 10 largest participants by user type, ranked by stock in the latest month",
++      topTitle: "Top {n} participants by registered Pix keys",
++      topSubtitle:
++        "Stock as of {date}, with separate rankings for individuals and businesses",
++      exportType: "Type",
++      exportMonth: "Month",
++      exportParticipant: "Participant",
++      exportKeys: "Keys",
++      keyAxisLabel: "Number of registered keys",
++    },
++    municipioPage: {
++      kpiValue: "Transacted value ({month})",
++      kpiCount: "Settled transactions ({month})",
++      rankingMunicipioTitle: "Municipality ranking",
++      rankingStateTitle: "State ranking",
++      rankTopStates: "Top {n} states by {metric} {perspective}",
++      rankTopMunicipios: "Top {n} municipalities by {metric} {perspective}",
++      rankStateSelected: "{metric} {perspective} in the selected state",
++      rankSubPeriod: "{segment}, {perspective} perspective, over the filtered period.{scope}",
++      rankSubPeople:
++        "{segment}, {perspective} perspective. Distinct people in {month}, the last month of the range — monthly counts do not add up over the period.{scope}",
++      colPosition: "Rank",
++      colState: "State",
++      colMunicipality: "Municipality",
++      seriesValue: "Value",
++      seriesTransactions: "Transactions",
++      seriesPeople: "People",
++      metricValor: "value",
++      metricTransacoes: "transactions",
++      metricPessoas: "people",
++      regiaoTitle: "Summary by region",
++      serieTitle: "Monthly series of the selected municipality",
++      filterHint: "All filters affect the cards and charts on this page.",
++      perspective: "Perspective",
++      segment: "Segment",
++      region: "Region",
++      state: "State",
++      selectState: "Select the state",
++      loadingState: "Loading state data...",
++      errorState: "Failed to load state data.",
++      errorIndex: "Failed to load municipality list.",
++      payer: "Payer",
++      receiver: "Receiver",
++      paid: "paid",
++      received: "received",
++      viewValue: "Value",
++      viewTransactions: "Transactions",
++      viewPeople: "People",
++      segAll: "Ind. + Bus.",
++      segPf: "Individual",
++      segPj: "Business",
++      peopleNote:
++        "People counts distinct users in each month, allocated to the municipality of their banking domicile. Counts do not accumulate over time: the main card and the rankings use the last month of the range as reference.",
++      cardPeople: "People — {perspective}{month}",
++      cardPeopleMonth: " in {month}",
++      cardTotalPeriod: "{view} {perspective} in the period",
++      cardMonthlyAvg: "Average monthly {view}",
++      cardTicket: "Average ticket",
++      metric: "Metric",
++      regiaoValorPago: "Value paid",
++      regiaoValorRecebido: "Value received",
++      regiaoTransacoesPagas: "Transactions paid",
++      regiaoTransacoesRecebidas: "Transactions received",
++      regiaoPessoasPagadoras: "Paying people",
++      regiaoPessoasRecebedoras: "Receiving people",
++      regiaoFallbackTitle: "Historical series",
++      regiaoScopeBrasil: "Brazil (all states)",
++      regiaoChartTitle: "{metric}, month by month: {scope}",
++      regiaoSubPeople:
++        "Distinct {segment} people in each month, updated according to all page filters. The bars do not accumulate: anyone who transacts in several months is counted in each of them.",
++      regiaoSubDefault:
++        "Monthly sum of {segment}, updated according to all page filters.",
++    },
++    transacoesPage: {
++      kpiValue: "Transacted value ({month})",
++      kpiCount: "Settled transactions ({month})",
++      kpiTicket: "Average ticket",
++      filterHint: "All filters affect the volume and category charts below.",
++      trendTitle: "Settled Pix transactions per month",
++      trendSeriesValue: "Transacted value",
++      trendSubValue: "Monthly value settled in the SPI, all of Brazil",
++      trendSubCount: "Monthly volume settled in the SPI, all of Brazil",
++      breakdownAbsoluteTitle: "Composition by category",
++      breakdownShareTitle: "Composition by category (%)",
++      breakdownValueTitle: "Value by category",
++      breakdownMetricValue: "transacted value",
++      breakdownMetricCount: "settled transactions",
++      breakdownSubShare:
++        "Each category's share of the {metric} in each month. Each bar sums to 100%.",
++      breakdownSubAbsolute:
++        "Monthly composition of {metric}, by the selected dimension.",
++      breakdownShareHint: " Percentages are each pairing's share of the month's total.",
++      matrixTitle: "Nature matrix (payer × receiver)",
++      matrixSubtitle: "Payer-by-receiver crossing on the Nature dimension.",
++      matrixPaid: "Transactions paid",
++      matrixReceived: "Transactions received",
++      matrixEntityPeople: "People",
++      matrixEntityBusiness: "Businesses",
++      matrixEntityGovernment: "Government",
++      matrixMetricValue: "Value (R$)",
++      matrixMetricCount: "Transactions",
++      matrixMetricTicket: "Average ticket",
++      matrixNoData: "No nature data available.",
++      matrixSubMonth:
++        "Who pays (rows) and who receives (columns) in {month}. Drag the control or use play to move through the months. Always a single month — the page's period filters do not affect this matrix.",
++      matrixPayer: "Payer",
++      matrixReceiver: "Receiver",
++      matrixNoteLog:
++        "Color intensity uses a logarithmic scale: cells vary by orders of magnitude and, on a linear scale, nearly all would share the same tone. Use the numbers for precise comparisons.",
++      matrixNoteShare:
++        " Percentages are each pairing's share of the month's total.",
++      matrixNoteOutLead: "Transactions with no identified nature in the source (“Not available”) fall outside the matrix: they represent ",
++      matrixNoteOutTail: " of the month's value ({count} transactions) and do not fit any payer–receiver pair.",
++      matrixLessThan: "less than 0.01%",
++      brasilNote:
++        " Whole of Brazil — not affected by the region, state, and municipality filters.",
++    },
++    dimensions: {
++      porPFPJPagador: "Individual vs. business (payer)",
++      porRegiaoPagador: "Payer region",
++      porNatureza: "Transaction nature",
++      porFinalidade: "Purpose",
++      porFormaIniciacao: "Initiation method",
++    },
++    glossaryUi: {
++      eyebrow: "Glossary",
++      heading: "Definitions",
++    },
++  },
++};
+diff --git a/src/lib/tabs.js b/src/lib/tabs.js
+index 4f545cb..5878953 100644
+--- a/src/lib/tabs.js
++++ b/src/lib/tabs.js
+@@ -6,49 +6,82 @@
+ export const SITE_URL = "https://www.dadospix.com.br";
+ export const SITE_NAME = "Dados do Pix";
+ 
++// Cada aba carrega SEO nos dois idiomas. `labelKey` aponta para messages.nav.*
++// (usado pela navegação); title/description ptBR|en alimentam useDocumentMeta.
+ export const TABS = [
+   {
+     key: "overview",
++    labelKey: "nav.overview",
+     label: "Visão geral",
+     path: "/",
+     title: "Dados do Pix — visualizações dos dados abertos do Banco Central",
+     description:
+       "Painel independente com as estatísticas públicas do Pix: usuários, chaves, transações por município e volume mensal. Dados abertos do Banco Central do Brasil em gráficos interativos.",
++    titleEn: "Pix Data — visualizations of the Central Bank of Brazil's open data",
++    descriptionEn:
++      "Independent dashboard of public Pix statistics: users, keys, transactions by municipality, and monthly volume. Central Bank of Brazil open data in interactive charts.",
+   },
+   {
+     key: "dict",
++    labelKey: "nav.dict",
+     label: "Usuários",
+     path: "/usuarios",
+     title: "Quantas pessoas e empresas têm Pix — usuários no DICT | Dados do Pix",
+     description:
+       "Estoque mensal de usuários pessoa física e jurídica cadastrados no DICT, desde 2020. Acompanhe a adoção do Pix no Brasil mês a mês, com dados abertos do Banco Central.",
++    titleEn: "How many people and businesses use Pix — DICT users | Pix Data",
++    descriptionEn:
++      "Monthly stock of individual and business users registered in the DICT since 2020. Track Pix adoption in Brazil month by month, with Central Bank open data.",
+   },
+   {
+     key: "chaves",
++    labelKey: "nav.chaves",
+     label: "Chaves",
+     path: "/chaves",
+     title: "Quantas chaves Pix existem — total e por instituição | Dados do Pix",
+     description:
+       "Estoque de chaves Pix registradas no DICT por tipo (CPF, CNPJ, e-mail, celular e chave aleatória), com evolução histórica e distribuição entre as instituições participantes.",
++    titleEn: "How many Pix keys exist — total and by institution | Pix Data",
++    descriptionEn:
++      "Stock of Pix keys registered in the DICT by type (CPF, CNPJ, email, phone, and random key), with historical evolution and distribution across participating institutions.",
+   },
+   {
+     key: "municipio",
++    labelKey: "nav.municipio",
+     label: "Transações por Município",
+     path: "/municipios",
+     title: "Transações Pix por município, estado e região | Dados do Pix",
+     description:
+       "Valor e quantidade de transações Pix por estado e região, a partir do dado bruto por município. Compare a intensidade de uso do Pix entre as unidades da federação.",
++    titleEn: "Pix transactions by municipality, state, and region | Pix Data",
++    descriptionEn:
++      "Value and volume of Pix transactions by state and region, from the raw per-municipality data. Compare Pix usage intensity across the federal units.",
+   },
+   {
+     key: "transacoes",
++    labelKey: "nav.transacoes",
+     label: "Estatísticas de Transações",
+     path: "/transacoes",
+     title: "Quanto o Pix movimenta por mês — valor e volume | Dados do Pix",
+     description:
+       "Total mensal de valor e quantidade de transações Pix, com composição por natureza, finalidade, forma de iniciação, região e tipo de pagador (PF/PJ).",
++    titleEn: "How much Pix moves per month — value and volume | Pix Data",
++    descriptionEn:
++      "Monthly total of Pix transaction value and volume, with breakdown by nature, purpose, initiation method, region, and payer type (individual/business).",
+   },
+ ];
+ 
++/** SEO title/description da aba no idioma dado. */
++export function tabSeo(tab, lang) {
++  if (lang === "en") {
++    return {
++      title: tab.titleEn ?? tab.title,
++      description: tab.descriptionEn ?? tab.description,
++    };
++  }
++  return { title: tab.title, description: tab.description };
++}
++
+ export const DEFAULT_TAB = TABS[0];
+ 
+ /** Aba correspondente a um pathname. Cai na Visão geral se não houver match. */
+diff --git a/src/lib/useDocumentMeta.js b/src/lib/useDocumentMeta.js
+index 833b846..eb7d743 100644
+--- a/src/lib/useDocumentMeta.js
++++ b/src/lib/useDocumentMeta.js
+@@ -5,7 +5,7 @@
+ // Consumido por: App.jsx
+ 
+ import { useEffect } from "react";
+-import { absoluteUrl, SITE_NAME } from "./tabs";
++import { absoluteUrl, SITE_NAME, tabSeo } from "./tabs";
+ 
+ /** Cria ou atualiza <meta name="..."> no <head>. */
+ function setMetaByName(name, content) {
+@@ -44,25 +44,27 @@ function setCanonical(href) {
+  * Aplica os metadados da aba ativa ao <head>.
+  * @param {{ title: string, description: string, path: string }} tab
+  */
+-export function useDocumentMeta(tab) {
++export function useDocumentMeta(tab, lang = "pt") {
+   useEffect(() => {
+     if (!tab) return;
+ 
+     const url = absoluteUrl(tab.path);
++    const { title, description } = tabSeo(tab, lang);
++    const ogLocale = lang === "en" ? "en_US" : "pt_BR";
+ 
+-    document.title = tab.title;
+-    setMetaByName("description", tab.description);
++    document.title = title;
++    setMetaByName("description", description);
+     setCanonical(url);
+ 
+     setMetaByProperty("og:type", "website");
+     setMetaByProperty("og:site_name", SITE_NAME);
+-    setMetaByProperty("og:locale", "pt_BR");
+-    setMetaByProperty("og:title", tab.title);
+-    setMetaByProperty("og:description", tab.description);
++    setMetaByProperty("og:locale", ogLocale);
++    setMetaByProperty("og:title", title);
++    setMetaByProperty("og:description", description);
+     setMetaByProperty("og:url", url);
+ 
+     setMetaByName("twitter:card", "summary_large_image");
+-    setMetaByName("twitter:title", tab.title);
+-    setMetaByName("twitter:description", tab.description);
+-  }, [tab]);
++    setMetaByName("twitter:title", title);
++    setMetaByName("twitter:description", description);
++  }, [tab, lang]);
+ }
+\ No newline at end of file
+diff --git a/src/main.jsx b/src/main.jsx
+index f8b1175..6d140ed 100644
+--- a/src/main.jsx
++++ b/src/main.jsx
+@@ -10,14 +10,17 @@ import { Analytics } from '@vercel/analytics/react'
+ import './index.css'
+ import App from './App.jsx'
+ import { initAnalytics } from './lib/analytics.js'
++import { I18nProvider } from './lib/i18n/I18nContext.jsx'
+ 
+ initAnalytics()
+ 
+ createRoot(document.getElementById('root')).render(
+   <StrictMode>
+-    <BrowserRouter>
+-      <App />
+-      <Analytics />
+-    </BrowserRouter>
++    <I18nProvider>
++      <BrowserRouter>
++        <App />
++        <Analytics />
++      </BrowserRouter>
++    </I18nProvider>
+   </StrictMode>,
+ )
+\ No newline at end of file
+diff --git a/src/pages/ChavesPixPage.jsx b/src/pages/ChavesPixPage.jsx
+index 2fd4672..f1f0912 100644
+--- a/src/pages/ChavesPixPage.jsx
++++ b/src/pages/ChavesPixPage.jsx
+@@ -7,6 +7,9 @@ import {
+   formatAnoMes,
+   formatNumberCompact,
+ } from "../lib/format";
++import { Glossary } from "../components/shared/Glossary";
++import { useI18n } from "../lib/i18n/I18nContext";
++import { getGlossary } from "../lib/i18n/glossary";
+ 
+ function getTimestamp(date) {
+   if (!date) return 0;
+@@ -19,6 +22,7 @@ function getTimestamp(date) {
+ }
+ 
+ export function ChavesPixPage({ chaves }) {
++  const { t, lang } = useI18n();
+   const [topN, setTopN] = useState(5);
+ 
+   const historicalData = useMemo(
+@@ -70,7 +74,7 @@ export function ChavesPixPage({ chaves }) {
+ 
+   const referenceMonth = useMemo(() => {
+     if (!latestRecord?.data) {
+-      return "último mês disponível";
++      return t("common.latestMonth");
+     }
+ 
+     const numericMonth = Number(
+@@ -80,7 +84,7 @@ export function ChavesPixPage({ chaves }) {
+     );
+ 
+     return formatAnoMes(numericMonth);
+-  }, [latestRecord]);
++  }, [latestRecord, t]);
+ 
+   // Série histórica por participante (Top 10 por tipo). Só existe se o
+   // snapshot foi gerado por uma versão do fetch-data.mjs que inclui a chave
+@@ -106,21 +110,21 @@ export function ChavesPixPage({ chaves }) {
+     <>
+       <section className="kpi-row">
+         <StatTile
+-          label={`Total de chaves Pix (${referenceMonth})`}
++          label={t("chavesPage.kpiTotal", { month: referenceMonth })}
+           value={formatNumberCompact(
+             Number(latestRecord?.total) || 0
+           )}
+         />
+ 
+         <StatTile
+-          label={`Chaves de pessoa física (${referenceMonth})`}
++          label={t("chavesPage.kpiPf", { month: referenceMonth })}
+           value={formatNumberCompact(
+             Number(latestRecord?.PF) || 0
+           )}
+         />
+ 
+         <StatTile
+-          label={`Chaves de pessoa jurídica (${referenceMonth})`}
++          label={t("chavesPage.kpiPj", { month: referenceMonth })}
+           value={formatNumberCompact(
+             Number(latestRecord?.PJ) || 0
+           )}
+@@ -156,6 +160,8 @@ export function ChavesPixPage({ chaves }) {
+           />
+         </section>
+       )}
++
++      <Glossary items={getGlossary("chaves", lang)} />
+     </>
+   );
+ }
+\ No newline at end of file
+diff --git a/src/pages/EstatisticasTransacoesPage.jsx b/src/pages/EstatisticasTransacoesPage.jsx
+index bf1b3f4..335ed7d 100644
+--- a/src/pages/EstatisticasTransacoesPage.jsx
++++ b/src/pages/EstatisticasTransacoesPage.jsx
+@@ -4,7 +4,10 @@ import { StatTile } from "../components/shared/StatTile";
+ import { TrendChart } from "../components/charts/transacoes/TrendChart";
+ import { CategoryBreakdown } from "../components/charts/transacoes/CategoryBreakdown";
+ import { NaturezaMatrix } from "../components/charts/transacoes/NaturezaMatrix";
+-import { DIMENSIONS } from "../lib/categories";
++import { DIMENSIONS, dimensionLabel } from "../lib/categories";
++import { Glossary } from "../components/shared/Glossary";
++import { useI18n } from "../lib/i18n/I18nContext";
++import { getGlossary } from "../lib/i18n/glossary";
+ import { formatAnoMes, formatCurrencyCompact, formatCurrencyFull, formatNumberCompact } from "../lib/format";
+ 
+ /**
+@@ -13,10 +16,7 @@ import { formatAnoMes, formatCurrencyCompact, formatCurrencyFull, formatNumberCo
+  * O cubo de transações só traz valor e quantidade — não há contagem de pessoas
+  * como no cubo de municípios, então a visão "Pessoas" não existe aqui.
+  */
+-const VISOES = [
+-  { value: "VALOR", label: "Valor (R$)" },
+-  { value: "QUANTIDADE", label: "Transações" },
+-];
++const VISAO_VALUES = ["VALOR", "QUANTIDADE"];
+ 
+ /**
+  * Dimensões cruzadas disponíveis, na ordem em que aparecem no seletor.
+@@ -30,7 +30,12 @@ function pctDelta(current, previous) {
+ }
+ 
+ export function EstatisticasTransacoesPage({ transacoes }) {
++  const { t, lang } = useI18n();
+   const mensal = transacoes.mensal;
++  const VISOES = VISAO_VALUES.map((value) => ({
++    value,
++    label: value === "VALOR" ? t("common.valueBRL") : t("common.transactions"),
++  }));
+   const months = useMemo(() => [...new Set(mensal.map((r) => r.AnoMes))].sort(), [mensal]);
+ 
+   const [start, setStart] = useState(null);
+@@ -52,16 +57,16 @@ export function EstatisticasTransacoesPage({ transacoes }) {
+     <>
+       <section className="kpi-row">
+         <StatTile
+-          label={`Valor transacionado (${formatAnoMes(latest.AnoMes)})`}
++          label={t("transacoesPage.kpiValue", { month: formatAnoMes(latest.AnoMes) })}
+           value={formatCurrencyCompact(latest.VALOR)}
+           delta={pctDelta(latest.VALOR, previous?.VALOR)}
+         />
+         <StatTile
+-          label={`Transações liquidadas (${formatAnoMes(latest.AnoMes)})`}
++          label={t("transacoesPage.kpiCount", { month: formatAnoMes(latest.AnoMes) })}
+           value={formatNumberCompact(latest.QUANTIDADE)}
+           delta={pctDelta(latest.QUANTIDADE, previous?.QUANTIDADE)}
+         />
+-        <StatTile label="Ticket médio" value={formatCurrencyFull(latest.VALOR / latest.QUANTIDADE)} />
++        <StatTile label={t("transacoesPage.kpiTicket")} value={formatCurrencyFull(latest.VALOR / latest.QUANTIDADE)} />
+       </section>
+ 
+       <Filters
+@@ -70,10 +75,10 @@ export function EstatisticasTransacoesPage({ transacoes }) {
+         end={range.end}
+         onStartChange={setStart}
+         onEndChange={setEnd}
+-        hint="Todos os filtros afetam os gráficos de volume e categorias abaixo."
++        hint={t("transacoesPage.filterHint")}
+       >
+         <label>
+-          Visão
++          {t("common.view")}
+           <select value={visao} onChange={(event) => setVisao(event.target.value)}>
+             {VISOES.map((item) => (
+               <option key={item.value} value={item.value}>
+@@ -84,14 +89,14 @@ export function EstatisticasTransacoesPage({ transacoes }) {
+         </label>
+ 
+         <label>
+-          Dimensão
++          {t("common.dimension")}
+           <select
+             value={dimensionKey}
+             onChange={(event) => setDimensionKey(event.target.value)}
+           >
+             {DIMENSION_KEYS.map((key) => (
+               <option key={key} value={key}>
+-                {DIMENSIONS[key].label}
++                {dimensionLabel(key, lang)}
+               </option>
+             ))}
+           </select>
+@@ -145,6 +150,8 @@ export function EstatisticasTransacoesPage({ transacoes }) {
+       <section className="charts-grid">
+         <NaturezaMatrix porNatureza={transacoes.porNatureza} />
+       </section>
++
++      <Glossary items={getGlossary("transacoes", lang)} />
+     </>
+   );
+ }
+\ No newline at end of file
+diff --git a/src/pages/OverviewPage.jsx b/src/pages/OverviewPage.jsx
+index 117423b..d4eb8fc 100644
+--- a/src/pages/OverviewPage.jsx
++++ b/src/pages/OverviewPage.jsx
+@@ -1,49 +1,36 @@
+-const RESOURCES = [
+-  {
+-    tab: "Usuários",
+-    question: "Quantas pessoas e empresas já têm Pix?",
+-    description:
+-      "Estoque mensal de usuários pessoa física e jurídica cadastrados no DICT - o diretório que vincula chaves Pix a contas transacionais. Mostra a adoção do Pix ao longo do tempo, desde 2020.",
+-  },
+-  {
+-    tab: "Chaves",
+-    question: "Quantas chaves Pix existem e onde estão?",
+-    description:
+-      "Estoque de chaves Pix registradas no DICT (CPF/CNPJ, e-mail, celular e chave aleatória), com a evolução histórica e a distribuição entre as instituições participantes do arranjo.",
+-  },
+-  {
+-    tab: "Transações por Município",
+-    question: "Como o Pix se distribui pelo território?",
+-    description:
+-      "Valor e quantidade de transações Pix agregados por estado e região, a partir do dado bruto por município. Permite comparar a intensidade de uso do Pix entre as unidades da federação.",
+-  },
+-  {
+-    tab: "Estatísticas de Transações",
+-    question: "Quanto e como o Pix movimenta por mês?",
+-    description:
+-      "Total mensal de valor e quantidade de transações, com a composição por natureza, finalidade, forma de iniciação, região e tipo de pagador (PF/PJ). É a visão macro do fluxo do Pix.",
+-  },
+-];
++import { useI18n } from "../lib/i18n/I18nContext";
++import { TABS } from "../lib/tabs";
++
++// A ordem dos cards segue as abas de conteúdo (todas menos a Visão geral).
++// Cada card puxa pergunta/descrição de messages.overview.resources[key].
++const RESOURCE_KEYS = ["dict", "chaves", "municipio", "transacoes"];
+ 
+ export function OverviewPage() {
++  const { t } = useI18n();
++
++  const cards = RESOURCE_KEYS.map((key) => {
++    const tab = TABS.find((tabItem) => tabItem.key === key);
++    return {
++      key,
++      badge: t(tab.labelKey),
++      question: t(`overview.resources.${key}.question`),
++      description: t(`overview.resources.${key}.description`),
++    };
++  });
++
+   return (
+     <>
+       <section className="overview-intro">
+-        <span className="overview-intro__eyebrow">Visão geral</span>
+-        <h2>O que você encontra neste painel</h2>
+-        <p>
+-          Este é um projeto independente que reúne, em um só lugar, as principais estatísticas públicas do Pix divulgadas pelo Banco Central do Brasil. Os números vêm da API de dados abertos do BC, mas as visualizações, os recortes e a interface são de autoria própria — não se trata de um canal oficial do Banco Central.
+-        </p>
+-        <p>
+-          Os dados são servidos como um snapshot estático, gerado periodicamente a partir da API.
+-          Cada aba abaixo corresponde a um conjunto de dados diferente. Comece pela pergunta que você quer responder.
+-        </p>
++        <span className="overview-intro__eyebrow">{t("overview.eyebrow")}</span>
++        <h2>{t("overview.heading")}</h2>
++        <p>{t("overview.intro1")}</p>
++        <p>{t("overview.intro2")}</p>
+       </section>
+ 
+       <section className="charts-grid overview-grid">
+-        {RESOURCES.map(({ tab, question, description }) => (
+-          <article key={tab} className="chart-card overview-card">
+-            <span className="overview-card__badge">{tab}</span>
++        {cards.map(({ key, badge, question, description }) => (
++          <article key={key} className="chart-card overview-card">
++            <span className="overview-card__badge">{badge}</span>
+             <h3 className="overview-card__question">{question}</h3>
+             <p className="overview-card__description">{description}</p>
+           </article>
+@@ -51,4 +38,4 @@ export function OverviewPage() {
+       </section>
+     </>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/src/pages/TransacoesMunicipioPage.jsx b/src/pages/TransacoesMunicipioPage.jsx
+index 7a13dda..5f68385 100644
+--- a/src/pages/TransacoesMunicipioPage.jsx
++++ b/src/pages/TransacoesMunicipioPage.jsx
+@@ -10,34 +10,15 @@ import {
+   formatCurrencyFull,
+   formatNumberCompact,
+ } from "../lib/format";
++import { Glossary } from "../components/shared/Glossary";
++import { useI18n } from "../lib/i18n/I18nContext";
++import { getGlossary } from "../lib/i18n/glossary";
+ 
+-const PERSPECTIVAS = [
+-  { value: "Pagador", label: "Pagador" },
+-  { value: "Recebedor", label: "Recebedor" },
+-];
+-
+-const VISOES = [
+-  { value: "valor", label: "Valor (R$)" },
+-  { value: "transacoes", label: "Transações" },
+-  { value: "pessoas", label: "Pessoas" },
+-];
+-
+-const VISAO_LABEL = {
+-  valor: "Valor",
+-  transacoes: "Transações",
+-  pessoas: "Pessoas",
+-};
+-
+-const SEGMENTOS = [
+-  { value: "Todos", label: "PF + PJ" },
+-  { value: "PF", label: "Pessoa Física" },
+-  { value: "PJ", label: "Pessoa Jurídica" },
+-];
+-
+-const PERSPECTIVA_LABEL = {
+-  Pagador: "pago",
+-  Recebedor: "recebido",
+-};
++// Valores das opções (estáveis, independem de idioma). Os rótulos são
++// resolvidos via t() dentro do componente.
++const PERSPECTIVA_VALUES = ["Pagador", "Recebedor"];
++const VISAO_VALUES = ["valor", "transacoes", "pessoas"];
++const SEGMENTO_VALUES = ["Todos", "PF", "PJ"];
+ 
+ /**
+  * Prefixo do campo de cada visão.
+@@ -120,6 +101,41 @@ function formatMesReferencia(anoMes) {
+ }
+ 
+ export function TransacoesMunicipioPage({ municipio }) {
++  const { t, lang } = useI18n();
++
++  // Rótulos das opções, resolvidos no idioma ativo.
++  const PERSPECTIVAS = PERSPECTIVA_VALUES.map((value) => ({
++    value,
++    label: value === "Pagador" ? t("municipioPage.payer") : t("municipioPage.receiver"),
++  }));
++  const VISOES = VISAO_VALUES.map((value) => ({
++    value,
++    label:
++      value === "valor"
++        ? t("common.valueBRL")
++        : value === "transacoes"
++          ? t("municipioPage.viewTransactions")
++          : t("municipioPage.viewPeople"),
++  }));
++  const SEGMENTOS = SEGMENTO_VALUES.map((value) => ({
++    value,
++    label:
++      value === "Todos"
++        ? t("municipioPage.segAll")
++        : value === "PF"
++          ? t("municipioPage.segPf")
++          : t("municipioPage.segPj"),
++  }));
++  const VISAO_LABEL = {
++    valor: t("municipioPage.viewValue"),
++    transacoes: t("municipioPage.viewTransactions"),
++    pessoas: t("municipioPage.viewPeople"),
++  };
++  const PERSPECTIVA_LABEL = {
++    Pagador: t("municipioPage.paid"),
++    Recebedor: t("municipioPage.received"),
++  };
++
+   /**
+    * Último mês permitido na página.
+    *
+@@ -500,7 +516,7 @@ export function TransacoesMunicipioPage({ municipio }) {
+ 
+   const visaoLabel =
+     VISAO_LABEL[filtros.visao] ??
+-    "Métrica";
++    t("municipioPage.metric");
+ 
+   /**
+    * Rótulo do primeiro card. Em Pessoas ele deixa explícito que o número
+@@ -508,12 +524,16 @@ export function TransacoesMunicipioPage({ municipio }) {
+    */
+   const totalLabel =
+     filtros.visao === "pessoas"
+-      ? `Pessoas — ${perspectivaLabel}${
+-          mesReferenciaLabel
+-            ? ` em ${mesReferenciaLabel}`
+-            : ""
+-        }`
+-      : `${visaoLabel} ${perspectivaLabel} no período`;
++      ? t("municipioPage.cardPeople", {
++          perspective: perspectivaLabel,
++          month: mesReferenciaLabel
++            ? t("municipioPage.cardPeopleMonth", { month: mesReferenciaLabel })
++            : "",
++        })
++      : t("municipioPage.cardTotalPeriod", {
++          view: visaoLabel,
++          perspective: perspectivaLabel,
++        });
+ 
+   return (
+     <>
+@@ -537,7 +557,7 @@ export function TransacoesMunicipioPage({ municipio }) {
+             end: normalizeMonth(value),
+           }))
+         }
+-        hint="Todos os filtros afetam os cards e gráficos da página."
++        hint={t("municipioPage.filterHint")}
+       >
+         {/*
+           O MunicipioSelector controla a seleção
+@@ -565,7 +585,7 @@ export function TransacoesMunicipioPage({ municipio }) {
+         />
+ 
+         <label>
+-          Perspectiva
++          {t("municipioPage.perspective")}
+           <select
+             value={filtros.perspectiva}
+             onChange={(event) =>
+@@ -588,7 +608,7 @@ export function TransacoesMunicipioPage({ municipio }) {
+         </label>
+ 
+         <label>
+-          Visão
++          {t("common.view")}
+           <select
+             value={filtros.visao}
+             onChange={(event) =>
+@@ -611,7 +631,7 @@ export function TransacoesMunicipioPage({ municipio }) {
+         </label>
+ 
+         <label>
+-          Segmento
++          {t("municipioPage.segment")}
+           <select
+             value={filtros.segmento}
+             onChange={(event) =>
+@@ -636,10 +656,7 @@ export function TransacoesMunicipioPage({ municipio }) {
+ 
+       {filtros.visao === "pessoas" && (
+         <div className="state-message">
+-          Pessoas conta usuários distintos em cada mês, alocados ao município
+-          do domicílio bancário. As contagens não se acumulam ao longo do
+-          tempo: o card principal e os rankings usam o último mês do intervalo
+-          como referência.
++          {t("municipioPage.peopleNote")}
+         </div>
+       )}
+ 
+@@ -650,12 +667,12 @@ export function TransacoesMunicipioPage({ municipio }) {
+         />
+ 
+         <StatTile
+-          label={`${visaoLabel} médio mensal`}
++          label={t("municipioPage.cardMonthlyAvg", { view: visaoLabel })}
+           value={mediaMensal}
+         />
+ 
+         <StatTile
+-          label="Ticket médio"
++          label={t("municipioPage.cardTicket")}
+           value={ticketMedio}
+         />
+       </section>
+@@ -712,6 +729,8 @@ export function TransacoesMunicipioPage({ municipio }) {
+           visao={filtros.visao}
+         />
+       </section>
++
++      <Glossary items={getGlossary("municipio", lang)} />
+     </>
+   );
+ }
+\ No newline at end of file
+diff --git a/src/pages/UsuariosDictPage.jsx b/src/pages/UsuariosDictPage.jsx
+index 6092cb1..d96d2b7 100644
+--- a/src/pages/UsuariosDictPage.jsx
++++ b/src/pages/UsuariosDictPage.jsx
+@@ -1,7 +1,10 @@
+ import { useMemo, useState } from "react";
+ import { StatTile } from "../components/shared/StatTile";
++import { Glossary } from "../components/shared/Glossary";
+ import { UsersGrowthChart } from "../components/charts/dict/UsersGrowthChart";
+ import { formatAnoMes, formatNumberCompact } from "../lib/format";
++import { useI18n } from "../lib/i18n/I18nContext";
++import { getGlossary } from "../lib/i18n/glossary";
+ 
+ function pctDelta(current, previous) {
+   if (!previous) return null;
+@@ -12,35 +15,8 @@ function anoMesOf(dateStr) {
+   return Number(dateStr.slice(0, 7).replace("-", ""));
+ }
+ 
+-const DICT_DEFINITIONS = [
+-  {
+-    term: "DICT (Diretório de Identificadores de Contas Transacionais)",
+-    description:
+-      "Base de dados mantida pelo Banco Central que armazena o vínculo entre as chaves Pix e as contas transacionais dos usuários recebedores. É o componente do arranjo Pix que permite localizar a conta de destino a partir de uma chave, dispensando a troca manual de dados bancários.",
+-  },
+-  {
+-    term: "Usuário cadastrado no DICT",
+-    description:
+-      "Pessoa física ou jurídica que possui ao menos uma chave Pix registrada no DICT, vinculada a uma conta transacional em uma instituição participante do Pix.",
+-  },
+-  {
+-    term: "Pessoa física (PF)",
+-    description:
+-      "Usuários cadastrados no DICT identificados por CPF, ou que tenham vinculado ao menos uma chave (CPF, e-mail, celular ou chave aleatória) a uma conta de titularidade individual.",
+-  },
+-  {
+-    term: "Pessoa jurídica (PJ)",
+-    description:
+-      "Usuários cadastrados no DICT identificados por CNPJ, vinculados a contas transacionais de empresas ou outras entidades jurídicas.",
+-  },
+-  {
+-    term: "Chave Pix",
+-    description:
+-      "Apelido cadastrado no DICT (CPF/CNPJ, e-mail, número de celular ou chave aleatória) que identifica uma conta transacional específica, usado para iniciar pagamentos sem a necessidade de informar dados bancários completos.",
+-  },
+-];
+-
+ export function UsuariosDictPage({ usuariosDict }) {
++  const { t, lang } = useI18n();
+   const months = useMemo(() => [...new Set(usuariosDict.map((r) => anoMesOf(r.data)))].sort(), [usuariosDict]);
+   const [start, setStart] = useState(null);
+   const [end, setEnd] = useState(null);
+@@ -59,27 +35,27 @@ export function UsuariosDictPage({ usuariosDict }) {
+ 
+   const referenceMonth = useMemo(() => {
+     if (!latest?.data) {
+-      return "último mês disponível";
++      return t("common.latestMonth");
+     }
+ 
+     return formatAnoMes(anoMesOf(latest.data));
+-  }, [latest]);
++  }, [latest, t]);
+ 
+   return (
+     <>
+       <section className="kpi-row">
+         <StatTile
+-          label={`Usuários cadastrados no DICT (${referenceMonth})`}
++          label={t("dictPage.kpiTotal", { month: referenceMonth })}
+           value={formatNumberCompact(latest.total)}
+           delta={pctDelta(latest.total, previous?.total)}
+         />
+         <StatTile
+-          label={`Pessoa física (${referenceMonth})`}
++          label={t("dictPage.kpiPf", { month: referenceMonth })}
+           value={formatNumberCompact(latest.pessoaFisica)}
+           delta={pctDelta(latest.pessoaFisica, previous?.pessoaFisica)}
+         />
+         <StatTile
+-          label={`Pessoa jurídica (${referenceMonth})`}
++          label={t("dictPage.kpiPj", { month: referenceMonth })}
+           value={formatNumberCompact(latest.pessoaJuridica)}
+           delta={pctDelta(latest.pessoaJuridica, previous?.pessoaJuridica)}
+         />
+@@ -96,18 +72,7 @@ export function UsuariosDictPage({ usuariosDict }) {
+         />
+       </section>
+ 
+-      <section className="definitions-section">
+-        <span className="definitions-eyebrow">Glossário</span>
+-        <h3>Definições</h3>
+-        <dl>
+-          {DICT_DEFINITIONS.map(({ term, description }) => (
+-            <div key={term} className="definitions-item">
+-              <dt>{term}</dt>
+-              <dd>{description}</dd>
+-            </div>
+-          ))}
+-        </dl>
+-      </section>
++      <Glossary items={getGlossary("dict", lang)} />
+     </>
+   );
+-}
+\ No newline at end of file
++}

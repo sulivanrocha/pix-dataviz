@@ -10,14 +10,17 @@ import { Analytics } from '@vercel/analytics/react'
 import './index.css'
 import App from './App.jsx'
 import { initAnalytics } from './lib/analytics.js'
+import { I18nProvider } from './lib/i18n/I18nContext.jsx'
 
 initAnalytics()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <BrowserRouter>
-      <App />
-      <Analytics />
-    </BrowserRouter>
+    <I18nProvider>
+      <BrowserRouter>
+        <App />
+        <Analytics />
+      </BrowserRouter>
+    </I18nProvider>
   </StrictMode>,
 )

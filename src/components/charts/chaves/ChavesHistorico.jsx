@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { useI18n } from "../../../lib/i18n/I18nContext";
 import { ChartCard } from "../../shared/ChartCard";
 import { ChartTooltip } from "../../shared/ChartTooltip";
 import { CsvDownloadButton } from "../../shared/CsvDownloadButton";
@@ -108,6 +109,7 @@ function HistoryChart({
 export function ChavesHistorico({
   historico,
 }) {
+  const { t } = useI18n();
   const rows = useMemo(
     () =>
       historico.map((record) => ({
@@ -132,13 +134,13 @@ export function ChavesHistorico({
   const exportRows = useMemo(
     () =>
       rows.map((row) => ({
-        Mês: row.mes,
+        [t("common.referenceMonth")]: row.mes,
         Data: row.data,
-        "Pessoa física": row.PF,
-        "Pessoa jurídica": row.PJ,
+        [t("pfpj.pf")]: row.PF,
+        [t("pfpj.pj")]: row.PJ,
         Total: row.total,
       })),
-    [rows]
+    [rows, t]
   );
 
   const months = rows.length;
@@ -168,8 +170,8 @@ export function ChavesHistorico({
 
   return (
     <ChartCard
-      title="Evolução das chaves Pix cadastradas"
-      subtitle="Estoque mensal de chaves de pessoas físicas e jurídicas"
+      title={t("chavesPage.historicoTitle")}
+      subtitle={t("chavesPage.historicoSubtitle")}
       fullWidth
       tabs={
         <CsvDownloadButton
@@ -180,7 +182,7 @@ export function ChavesHistorico({
     >
       <div className="keys-history-grid">
         <HistoryChart
-          title="Pessoa física"
+          title={t("pfpj.pf")}
           rows={rows}
           dataKey="PF"
           color={categoryColor(
@@ -193,7 +195,7 @@ export function ChavesHistorico({
         />
 
         <HistoryChart
-          title="Pessoa jurídica"
+          title={t("pfpj.pj")}
           rows={rows}
           dataKey="PJ"
           color={categoryColor(

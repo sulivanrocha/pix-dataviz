@@ -17,6 +17,7 @@ import {
   formatNumberCompact,
   formatNumberFull,
 } from "../../../lib/format";
+import { useI18n } from "../../../lib/i18n/I18nContext";
 
 export function UsersGrowthChart({
   usuariosDict,
@@ -26,6 +27,7 @@ export function UsersGrowthChart({
   onStartChange,
   onEndChange,
 }) {
+  const { t } = useI18n();
   const rows = useMemo(
     () =>
       usuariosDict.map((r) => ({
@@ -41,11 +43,11 @@ export function UsersGrowthChart({
   const exportRows = useMemo(
     () =>
       rows.map((row) => ({
-        Mes: row.mes,
-        "Pessoa física": row.pessoaFisica,
-        "Pessoa jurídica": row.pessoaJuridica,
+        [t("common.referenceMonth")]: row.mes,
+        [t("pfpj.pf")]: row.pessoaFisica,
+        [t("pfpj.pj")]: row.pessoaJuridica,
       })),
-    [rows]
+    [rows, t]
   );
 
   const monthCount = rows.length;
@@ -75,8 +77,8 @@ export function UsersGrowthChart({
 
   return (
     <ChartCard
-      title="Usuários cadastrados no DICT"
-      subtitle="Evolução mensal de pessoas físicas e jurídicas desde o lançamento do Pix"
+      title={t("dictPage.chartTitle")}
+      subtitle={t("dictPage.chartSubtitle")}
       fullWidth
       tabs={
         <div className="users-growth-controls">
@@ -101,7 +103,7 @@ export function UsersGrowthChart({
             className="users-growth-panel__title"
             style={{ color: "var(--series-1)" }}
           >
-            Pessoa física
+            {t("pfpj.pf")}
           </h3>
 
           <ResponsiveContainer width="100%" height={300}>
@@ -158,7 +160,7 @@ export function UsersGrowthChart({
 
               <Bar
                 dataKey="pessoaFisica"
-                name="Pessoa física"
+                name={t("pfpj.pf")}
                 fill="var(--series-1)"
                 radius={[3, 3, 0, 0]}
                 barSize={barSize}
@@ -173,7 +175,7 @@ export function UsersGrowthChart({
             className="users-growth-panel__title"
             style={{ color: "var(--series-2)" }}
           >
-            Pessoa jurídica
+            {t("pfpj.pj")}
           </h3>
 
           <ResponsiveContainer width="100%" height={300}>
@@ -230,7 +232,7 @@ export function UsersGrowthChart({
 
               <Bar
                 dataKey="pessoaJuridica"
-                name="Pessoa jurídica"
+                name={t("pfpj.pj")}
                 fill="var(--series-2)"
                 radius={[3, 3, 0, 0]}
                 barSize={barSize}

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChartCard } from "../../shared/ChartCard";
+import { useI18n } from "../../../lib/i18n/I18nContext";
+import { getFormatLang } from "../../../lib/format";
 import {
   formatAnoMes,
   formatCurrencyCompact,
@@ -14,18 +16,18 @@ import {
  * é o pagador e a segunda o recebedor:
  * P = pessoa física, B = empresa (business), G = governo.
  */
-const ENTIDADES = [
-  { code: "P", label: "Pessoas", short: "P" },
-  { code: "B", label: "Empresas", short: "B" },
-  { code: "G", label: "Governo", short: "G" },
+const ENTIDADE_DEFS = [
+  { code: "P", labelKey: "transacoesPage.matrixEntityPeople", short: "P" },
+  { code: "B", labelKey: "transacoesPage.matrixEntityBusiness", short: "B" },
+  { code: "G", labelKey: "transacoesPage.matrixEntityGovernment", short: "G" },
 ];
 
 const NATUREZA_REGEX = /^([PBG])2([PBG])$/;
 
-const METRICAS = [
-  { value: "valor", label: "Valor (R$)" },
-  { value: "quantidade", label: "Transações" },
-  { value: "ticket", label: "Ticket médio" },
+const METRICA_DEFS = [
+  { value: "valor", labelKey: "transacoesPage.matrixMetricValue" },
+  { value: "quantidade", labelKey: "transacoesPage.matrixMetricCount" },
+  { value: "ticket", labelKey: "transacoesPage.matrixMetricTicket" },
 ];
 
 /**
@@ -74,6 +76,25 @@ function corDaCelula(intensidade) {
 }
 
 export function NaturezaMatrix({ porNatureza = [] }) {
+  const { t } = useI18n();
+  const ENTIDADES = useMemo(
+    () =>
+      ENTIDADE_DEFS.map((e) => ({
+        code: e.code,
+        short: e.short,
+        label: t(e.labelKey),
+      })),
+    [t]
+  );
+  const METRICAS = useMemo(
+    () =>
+      METRICA_DEFS.map((m) => ({
+        value: m.value,
+        label: t(m.labelKey),
+      })),
+    [t]
+  );
+  const percentLocale = getFormatLang() === "en" ? "en-US" : "pt-BR";
   const [metrica, setMetrica] = useState("valor");
 
   /**
@@ -243,7 +264,7 @@ export function NaturezaMatrix({ porNatureza = [] }) {
 
   const metricaSelector = (
     <label className="matrix-metric-select">
-      Métrica
+      {t("municipioPage.metric")}
       <select
         value={metrica}
         onChange={(event) => setMetrica(event.target.value)}
@@ -260,12 +281,12 @@ export function NaturezaMatrix({ porNatureza = [] }) {
   if (mesReferencia === null) {
     return (
       <ChartCard
-        title="Fluxo entre Pessoas, Empresas e Governo"
-        subtitle="Cruzamento de pagador e recebedor na dimensão Natureza."
+        title={t("transacoesPage.matrixTitle")}
+        subtitle={t("transacoesPage.matrixSubtitle")}
         fullWidth
       >
         <div className="state-message">
-          Não há dados de natureza disponíveis.
+          {t("transacoesPage.matrixNoData")}
         </div>
       </ChartCard>
     );
@@ -281,10 +302,8 @@ export function NaturezaMatrix({ porNatureza = [] }) {
 
   return (
     <ChartCard
-      title="Fluxo entre Pessoas, Empresas e Governo"
-      subtitle={`Quem paga (linhas) e quem recebe (colunas) em ${formatAnoMes(
-        mesReferencia
-      )}. Arraste o controle ou use o play para percorrer os meses. Sempre um único mês — os filtros de período da página não afetam esta matriz.`}
+      title={t("transacoesPage.matrixTitle")}
+      subtitle={t("transacoesPage.matrixSubMonth", { month: formatAnoMes(mesReferencia) })}
       tabs={metricaSelector}
       fullWidth
     >
@@ -294,7 +313,7 @@ export function NaturezaMatrix({ porNatureza = [] }) {
             type="button"
             className="matrix-play"
             onClick={() => setTocando((current) => !current)}
-            aria-label={tocando ? "Pausar" : "Reproduzir"}
+            aria-label={tocando ? t("common.pause") : t("common.play")}
             disabled={meses.length <= 1}
           >
             {tocando ? "❚❚" : "►"}
@@ -311,7 +330,7 @@ export function NaturezaMatrix({ porNatureza = [] }) {
               setTocando(false);
               setMesIndex(Number(event.target.value));
             }}
-            aria-label="Mês de referência"
+            aria-label={t("common.referenceMonth")}
           />
 
           <span className="matrix-timeline-label">
@@ -330,9 +349,9 @@ export function NaturezaMatrix({ porNatureza = [] }) {
           <thead>
             <tr>
               <th scope="col" className="natureza-matrix-corner">
-                <span className="natureza-matrix-corner-pagador">Pagador</span>
+                <span className="natureza-matrix-corner-pagador">{t("transacoesPage.matrixPayer")}</span>
                 <span className="natureza-matrix-corner-recebedor">
-                  Recebedor
+                  {t("transacoesPage.matrixReceiver")}
                 </span>
               </th>
               {ENTIDADES.map((coluna) => (
@@ -369,8 +388,8 @@ export function NaturezaMatrix({ porNatureza = [] }) {
                       {percentual !== null && (
                         <span className="natureza-matrix-share">
                           {percentual < 0.01 && percentual > 0
-                            ? "<0,01%"
-                            : `${percentual.toLocaleString("pt-BR", {
+                            ? (percentLocale === "en-US" ? "<0.01%" : "<0,01%")
+                            : `${percentual.toLocaleString(percentLocale, {
                                 minimumFractionDigits: 2,
                                 maximumFractionDigits: 2,
                               })}%`}
@@ -385,24 +404,21 @@ export function NaturezaMatrix({ porNatureza = [] }) {
         </table>
 
         <p className="natureza-matrix-note">
-          A intensidade da cor usa escala logarítmica: as células variam por
-          ordens de grandeza e, numa escala linear, quase todas ficariam no
-          mesmo tom. Use os números para comparações precisas.
-          {metrica !== "ticket" &&
-            " Os percentuais são a participação de cada cruzamento no total do mês."}
+          {t("transacoesPage.matrixNoteLog")}
+          {metrica !== "ticket" && t("transacoesPage.matrixNoteShare")}
         </p>
 
         <p className="natureza-matrix-note">
-          Transações sem natureza identificada na base (&ldquo;Não
-          disponível&rdquo;) ficam fora da matriz: representam{" "}
+          {t("transacoesPage.matrixNoteOutLead")}
           {percentualFora < 0.01
-            ? "menos de 0,01%"
-            : `${percentualFora.toLocaleString("pt-BR", {
+            ? t("transacoesPage.matrixLessThan")
+            : `${percentualFora.toLocaleString(percentLocale, {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
-              })}%`}{" "}
-          do valor do mês ({formatNumberCompact(foraDoGrid.quantidade)}{" "}
-          transações) e não se encaixam em nenhum par pagador–recebedor.
+              })}%`}
+          {t("transacoesPage.matrixNoteOutTail", {
+            count: formatNumberCompact(foraDoGrid.quantidade),
+          })}
         </p>
       </div>
     </ChartCard>

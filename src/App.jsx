@@ -1,12 +1,15 @@
 // src/App.jsx
-// Rotas, cabeçalho e rodapé. O estado de aba agora vive na URL (react-router),
-// não em useState — é isso que dá ao Google cinco páginas indexáveis em vez de uma.
+// Rotas, cabeçalho e rodapé. O estado de aba vive na URL (react-router),
+// não em useState — é isso que dá ao Google cinco páginas indexáveis.
+// O idioma é um toggle de UI (não muda a URL); todo texto passa por t().
 
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { usePixData } from "./lib/usePixData";
 import { TabNav } from "./components/shared/TabNav";
+import { LanguageToggle } from "./components/shared/LanguageToggle";
 import { tabFromPath } from "./lib/tabs";
 import { useDocumentMeta } from "./lib/useDocumentMeta";
+import { useI18n } from "./lib/i18n/I18nContext";
 import { OverviewPage } from "./pages/OverviewPage";
 import { UsuariosDictPage } from "./pages/UsuariosDictPage";
 import { ChavesPixPage } from "./pages/ChavesPixPage";
@@ -16,21 +19,22 @@ import { EstatisticasTransacoesPage } from "./pages/EstatisticasTransacoesPage";
 function App() {
   const { status, data, error } = usePixData();
   const location = useLocation();
+  const { lang, t } = useI18n();
   const tab = tabFromPath(location.pathname);
 
   // Precisa ficar acima dos early returns: hooks não podem vir depois de
-  // um return condicional. tabFromPath só depende da URL, então é seguro.
-  useDocumentMeta(tab);
+  // um return condicional. Depende de tab e lang, ambos seguros aqui.
+  useDocumentMeta(tab, lang);
 
   if (status === "loading") {
-    return <p className="state-message">Carregando dados do Pix...</p>;
+    return <p className="state-message">{t("state.loading")}</p>;
   }
 
   if (status === "error") {
     return (
       <p className="state-message">
-        Não foi possível carregar os dados locais. Rode <code>node scripts/fetch-data.mjs</code> e recarregue a
-        página.
+        {t("state.error", { command: "" })}
+        <code>node scripts/fetch-data.mjs</code>
         <br />
         {String(error)}
       </p>
@@ -39,27 +43,34 @@ function App() {
 
   const { transacoes, usuariosDict, municipio, chaves } = data;
 
+  const snapshotDate = new Date(transacoes.generatedAt).toLocaleDateString(
+    lang === "en" ? "en-US" : "pt-BR"
+  );
+
   return (
     <>
       <header className="app-header">
+        <div className="app-header__lang">
+          <LanguageToggle />
+        </div>
+
         <div className="app-header__title">
-          <h1>Dados do Pix</h1>
+          <h1>{t("header.title")}</h1>
         </div>
 
         <p className="app-header__subtitle">
-          Visualizações interativas do Pix a partir dos dados abertos do Banco Central do Brasil. Snapshot
-          gerado em {new Date(transacoes.generatedAt).toLocaleDateString("pt-BR")}.
+          {t("header.subtitle", { date: snapshotDate })}
         </p>
 
         <div className="app-header__meta">
           <span className="app-header__author">
-            Projeto independente por{" "}
+            {t("header.author")}{" "}
             <a href="https://www.linkedin.com/in/sulivanrocha/" target="_blank" rel="noreferrer">
               Sulivan Rocha
             </a>
           </span>
           <span className="app-header__disclaimer">
-            Não é um serviço oficial do Banco Central.
+            {t("header.disclaimer")}
           </span>
         </div>
       </header>
@@ -76,21 +87,21 @@ function App() {
       </Routes>
 
       <footer className="app-footer">
-        Fonte: API pública de{" "}
+        {t("footer.source")}{" "}
         <a
           href="https://dadosabertos.bcb.gov.br/dataset/pix"
           target="_blank"
           rel="noreferrer"
         >
-          Dados Abertos do Banco Central do Brasil
+          {t("footer.sourceName")}
         </a>
-        . Código-fonte disponível no{" "}
+        . {t("footer.code")}{" "}
         <a
           href="https://github.com/sulivanrocha/pix-dataviz"
           target="_blank"
           rel="noreferrer"
         >
-          GitHub
+          {t("footer.github")}
         </a>
         .
       </footer>

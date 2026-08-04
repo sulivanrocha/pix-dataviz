@@ -5,7 +5,7 @@
 // Consumido por: App.jsx
 
 import { useEffect } from "react";
-import { absoluteUrl, SITE_NAME } from "./tabs";
+import { absoluteUrl, SITE_NAME, tabSeo } from "./tabs";
 
 /** Cria ou atualiza <meta name="..."> no <head>. */
 function setMetaByName(name, content) {
@@ -44,25 +44,27 @@ function setCanonical(href) {
  * Aplica os metadados da aba ativa ao <head>.
  * @param {{ title: string, description: string, path: string }} tab
  */
-export function useDocumentMeta(tab) {
+export function useDocumentMeta(tab, lang = "pt") {
   useEffect(() => {
     if (!tab) return;
 
     const url = absoluteUrl(tab.path);
+    const { title, description } = tabSeo(tab, lang);
+    const ogLocale = lang === "en" ? "en_US" : "pt_BR";
 
-    document.title = tab.title;
-    setMetaByName("description", tab.description);
+    document.title = title;
+    setMetaByName("description", description);
     setCanonical(url);
 
     setMetaByProperty("og:type", "website");
     setMetaByProperty("og:site_name", SITE_NAME);
-    setMetaByProperty("og:locale", "pt_BR");
-    setMetaByProperty("og:title", tab.title);
-    setMetaByProperty("og:description", tab.description);
+    setMetaByProperty("og:locale", ogLocale);
+    setMetaByProperty("og:title", title);
+    setMetaByProperty("og:description", description);
     setMetaByProperty("og:url", url);
 
     setMetaByName("twitter:card", "summary_large_image");
-    setMetaByName("twitter:title", tab.title);
-    setMetaByName("twitter:description", tab.description);
-  }, [tab]);
+    setMetaByName("twitter:title", title);
+    setMetaByName("twitter:description", description);
+  }, [tab, lang]);
 }

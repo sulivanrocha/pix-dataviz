@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
+import { useI18n } from "../../../lib/i18n/I18nContext";
 import { ChartCard } from "../../shared/ChartCard";
 import { ChartTooltip } from "../../shared/ChartTooltip";
 import {
@@ -10,20 +11,6 @@ import {
   formatCurrencyFull,
   formatNumberCompact,
 } from "../../../lib/format";
-
-const SEGMENTO_LABEL = {
-  Todos: "PF + PJ",
-  PF: "pessoa física",
-  PJ: "pessoa jurídica",
-};
-
-// Título por visão × perspectiva, com concordância correta
-// ("Valor pago" / "Transações pagas").
-const TITULO_METRICA = {
-  valor: { Pagador: "Valor pago", Recebedor: "Valor recebido" },
-  transacoes: { Pagador: "Transações pagas", Recebedor: "Transações recebidas" },
-  pessoas: { Pagador: "Pessoas pagadoras", Recebedor: "Pessoas recebedoras" },
-};
 
 function valorField(perspectiva, seg) {
   return `VL_${perspectiva}${seg}`;
@@ -54,11 +41,11 @@ function sumBySegmento(row, perspectiva, segmento, fieldFn) {
 }
 
 // Configuração de série/formatadores por visão.
-function getMetricConfig(visao) {
+function getMetricConfig(visao, t) {
   if (visao === "valor") {
     return {
       dataKey: "valor",
-      seriesName: "Valor",
+      seriesName: t("municipioPage.seriesValue"),
       axisFormatter: formatCurrencyCompact,
       tooltipFormatter: formatCurrencyFull,
     };
@@ -67,7 +54,7 @@ function getMetricConfig(visao) {
   if (visao === "transacoes") {
     return {
       dataKey: "quantidade",
-      seriesName: "Transações",
+      seriesName: t("municipioPage.seriesTransactions"),
       axisFormatter: formatNumberCompact,
       tooltipFormatter: formatNumberCompact,
     };
@@ -76,7 +63,7 @@ function getMetricConfig(visao) {
   if (visao === "pessoas") {
     return {
       dataKey: "pessoas",
-      seriesName: "Pessoas",
+      seriesName: t("municipioPage.seriesPeople"),
       axisFormatter: formatNumberCompact,
       tooltipFormatter: formatNumberCompact,
     };
@@ -98,9 +85,10 @@ export function RegiaoSummaryChart({
   visao = "valor",
   ultimoMesCompleto,
 }) {
+  const { t } = useI18n();
   const nivelMunicipio = Boolean(municipio && serieMunicipio?.length);
 
-  const metricConfig = getMetricConfig(visao);
+  const metricConfig = getMetricConfig(visao, t);
 
   const estadoNome = useMemo(() => {
     if (!estadoIbge) return null;
@@ -171,26 +159,46 @@ export function RegiaoSummaryChart({
   ]);
 
   const scopeParts = [];
-  if (regiao && regiao !== "Todas") scopeParts.push(regiao);
+  if (regiao && regiao !== "Todas") scopeParts.push(t(`regions.${regiao}`));
   if (estadoNome) scopeParts.push(estadoNome);
   if (nivelMunicipio) scopeParts.push(`${municipio.nome}, ${municipio.uf}`);
   const scopeLabel = scopeParts.length > 0
     ? scopeParts.join(" › ")
-    : "Brasil (todos os estados)";
+    : t("municipioPage.regiaoScopeBrasil");
+
+  const TITULO_METRICA = {
+    valor: {
+      Pagador: t("municipioPage.regiaoValorPago"),
+      Recebedor: t("municipioPage.regiaoValorRecebido"),
+    },
+    transacoes: {
+      Pagador: t("municipioPage.regiaoTransacoesPagas"),
+      Recebedor: t("municipioPage.regiaoTransacoesRecebidas"),
+    },
+    pessoas: {
+      Pagador: t("municipioPage.regiaoPessoasPagadoras"),
+      Recebedor: t("municipioPage.regiaoPessoasRecebedoras"),
+    },
+  };
+  const segmentoText = {
+    Todos: t("municipioPage.segAll"),
+    PF: t("pfpj.pf"),
+    PJ: t("pfpj.pj"),
+  }[segmento];
 
   const tituloMetrica =
-    TITULO_METRICA[visao]?.[perspectiva] ?? "Série histórica";
+    TITULO_METRICA[visao]?.[perspectiva] ?? t("municipioPage.regiaoFallbackTitle");
 
   // Em Pessoas cada barra é uma contagem independente do mês — falar em "soma
   // mensal" sugeriria um acumulado que não existe.
   const subtitle =
     visao === "pessoas"
-      ? `Pessoas distintas de ${SEGMENTO_LABEL[segmento]} em cada mês, atualizada conforme todos os filtros da página. As barras não se acumulam: quem transaciona em vários meses é contado em cada um deles.`
-      : `Soma mensal de ${SEGMENTO_LABEL[segmento]}, atualizada conforme todos os filtros da página.`;
+      ? t("municipioPage.regiaoSubPeople", { segment: segmentoText })
+      : t("municipioPage.regiaoSubDefault", { segment: segmentoText });
 
   return (
     <ChartCard
-      title={`${tituloMetrica}, mês a mês: ${scopeLabel}`}
+      title={t("municipioPage.regiaoChartTitle", { metric: tituloMetrica, scope: scopeLabel })}
       subtitle={subtitle}
       fullWidth
     >

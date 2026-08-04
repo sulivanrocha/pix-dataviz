@@ -10,34 +10,15 @@ import {
   formatCurrencyFull,
   formatNumberCompact,
 } from "../lib/format";
+import { Glossary } from "../components/shared/Glossary";
+import { useI18n } from "../lib/i18n/I18nContext";
+import { getGlossary } from "../lib/i18n/glossary";
 
-const PERSPECTIVAS = [
-  { value: "Pagador", label: "Pagador" },
-  { value: "Recebedor", label: "Recebedor" },
-];
-
-const VISOES = [
-  { value: "valor", label: "Valor (R$)" },
-  { value: "transacoes", label: "Transações" },
-  { value: "pessoas", label: "Pessoas" },
-];
-
-const VISAO_LABEL = {
-  valor: "Valor",
-  transacoes: "Transações",
-  pessoas: "Pessoas",
-};
-
-const SEGMENTOS = [
-  { value: "Todos", label: "PF + PJ" },
-  { value: "PF", label: "Pessoa Física" },
-  { value: "PJ", label: "Pessoa Jurídica" },
-];
-
-const PERSPECTIVA_LABEL = {
-  Pagador: "pago",
-  Recebedor: "recebido",
-};
+// Valores das opções (estáveis, independem de idioma). Os rótulos são
+// resolvidos via t() dentro do componente.
+const PERSPECTIVA_VALUES = ["Pagador", "Recebedor"];
+const VISAO_VALUES = ["valor", "transacoes", "pessoas"];
+const SEGMENTO_VALUES = ["Todos", "PF", "PJ"];
 
 /**
  * Prefixo do campo de cada visão.
@@ -120,6 +101,41 @@ function formatMesReferencia(anoMes) {
 }
 
 export function TransacoesMunicipioPage({ municipio }) {
+  const { t, lang } = useI18n();
+
+  // Rótulos das opções, resolvidos no idioma ativo.
+  const PERSPECTIVAS = PERSPECTIVA_VALUES.map((value) => ({
+    value,
+    label: value === "Pagador" ? t("municipioPage.payer") : t("municipioPage.receiver"),
+  }));
+  const VISOES = VISAO_VALUES.map((value) => ({
+    value,
+    label:
+      value === "valor"
+        ? t("common.valueBRL")
+        : value === "transacoes"
+          ? t("municipioPage.viewTransactions")
+          : t("municipioPage.viewPeople"),
+  }));
+  const SEGMENTOS = SEGMENTO_VALUES.map((value) => ({
+    value,
+    label:
+      value === "Todos"
+        ? t("municipioPage.segAll")
+        : value === "PF"
+          ? t("municipioPage.segPf")
+          : t("municipioPage.segPj"),
+  }));
+  const VISAO_LABEL = {
+    valor: t("municipioPage.viewValue"),
+    transacoes: t("municipioPage.viewTransactions"),
+    pessoas: t("municipioPage.viewPeople"),
+  };
+  const PERSPECTIVA_LABEL = {
+    Pagador: t("municipioPage.paid"),
+    Recebedor: t("municipioPage.received"),
+  };
+
   /**
    * Último mês permitido na página.
    *
@@ -500,7 +516,7 @@ export function TransacoesMunicipioPage({ municipio }) {
 
   const visaoLabel =
     VISAO_LABEL[filtros.visao] ??
-    "Métrica";
+    t("municipioPage.metric");
 
   /**
    * Rótulo do primeiro card. Em Pessoas ele deixa explícito que o número
@@ -508,12 +524,16 @@ export function TransacoesMunicipioPage({ municipio }) {
    */
   const totalLabel =
     filtros.visao === "pessoas"
-      ? `Pessoas — ${perspectivaLabel}${
-          mesReferenciaLabel
-            ? ` em ${mesReferenciaLabel}`
-            : ""
-        }`
-      : `${visaoLabel} ${perspectivaLabel} no período`;
+      ? t("municipioPage.cardPeople", {
+          perspective: perspectivaLabel,
+          month: mesReferenciaLabel
+            ? t("municipioPage.cardPeopleMonth", { month: mesReferenciaLabel })
+            : "",
+        })
+      : t("municipioPage.cardTotalPeriod", {
+          view: visaoLabel,
+          perspective: perspectivaLabel,
+        });
 
   return (
     <>
@@ -537,7 +557,7 @@ export function TransacoesMunicipioPage({ municipio }) {
             end: normalizeMonth(value),
           }))
         }
-        hint="Todos os filtros afetam os cards e gráficos da página."
+        hint={t("municipioPage.filterHint")}
       >
         {/*
           O MunicipioSelector controla a seleção
@@ -565,7 +585,7 @@ export function TransacoesMunicipioPage({ municipio }) {
         />
 
         <label>
-          Perspectiva
+          {t("municipioPage.perspective")}
           <select
             value={filtros.perspectiva}
             onChange={(event) =>
@@ -588,7 +608,7 @@ export function TransacoesMunicipioPage({ municipio }) {
         </label>
 
         <label>
-          Visão
+          {t("common.view")}
           <select
             value={filtros.visao}
             onChange={(event) =>
@@ -611,7 +631,7 @@ export function TransacoesMunicipioPage({ municipio }) {
         </label>
 
         <label>
-          Segmento
+          {t("municipioPage.segment")}
           <select
             value={filtros.segmento}
             onChange={(event) =>
@@ -636,10 +656,7 @@ export function TransacoesMunicipioPage({ municipio }) {
 
       {filtros.visao === "pessoas" && (
         <div className="state-message">
-          Pessoas conta usuários distintos em cada mês, alocados ao município
-          do domicílio bancário. As contagens não se acumulam ao longo do
-          tempo: o card principal e os rankings usam o último mês do intervalo
-          como referência.
+          {t("municipioPage.peopleNote")}
         </div>
       )}
 
@@ -650,12 +667,12 @@ export function TransacoesMunicipioPage({ municipio }) {
         />
 
         <StatTile
-          label={`${visaoLabel} médio mensal`}
+          label={t("municipioPage.cardMonthlyAvg", { view: visaoLabel })}
           value={mediaMensal}
         />
 
         <StatTile
-          label="Ticket médio"
+          label={t("municipioPage.cardTicket")}
           value={ticketMedio}
         />
       </section>
@@ -712,6 +729,8 @@ export function TransacoesMunicipioPage({ municipio }) {
           visao={filtros.visao}
         />
       </section>
+
+      <Glossary items={getGlossary("municipio", lang)} />
     </>
   );
 }

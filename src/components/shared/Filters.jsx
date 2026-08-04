@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { formatAnoMes } from "../../lib/format";
+import { useI18n } from "../../lib/i18n/I18nContext";
 
 function yearOf(anoMes) {
   return Math.floor(anoMes / 100);
@@ -98,6 +99,7 @@ export function Filters({
   layout = "row",
   children,
 }) {
+  const { t } = useI18n();
   const startOptions = months.filter((m) => m <= end);
   const endOptions = months.filter((m) => m >= start);
 
@@ -110,14 +112,14 @@ export function Filters({
     <div className="filters-row">
       <div className={periodClass}>
         <CascadingMonthSelect
-          label="De"
+          label={t("common.from")}
           value={start}
           options={startOptions}
           onChange={onStartChange}
         />
 
         <CascadingMonthSelect
-          label="Até"
+          label={t("common.to")}
           value={end}
           options={endOptions}
           onChange={onEndChange}
