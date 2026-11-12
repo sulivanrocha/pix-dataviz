@@ -1,0 +1,78 @@
+name: Refresh BCB data
+
+on:
+  schedule:
+    # Todo dia, do dia 5 ao 20, às 12:00 UTC (09:00 em São Paulo)
+    - cron: "0 12 5-20 * *"
+  workflow_dispatch: # permite rodar manualmente pela aba Actions
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies (if any)
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          fi
+
+      - name: Latest month before fetch
+        id: before
+        run: |
+          FILE=public/data/transacoes.json
+          if [ -f "$FILE" ]; then
+            LAST=$(grep -o '"AnoMes": *[0-9]\{6\}' "$FILE" | grep -o '[0-9]\{6\}' | sort -n | tail -1)
+          fi
+          echo "last=${LAST:-0}" >> "$GITHUB_OUTPUT"
+          echo "Antes: ${LAST:-nenhum}"
+
+      - name: Run ETL
+        run: node scripts/fetch-data.mjs
+
+      - name: Latest month after fetch
+        id: after
+        run: |
+          FILE=public/data/transacoes.json
+          LAST=$(grep -o '"AnoMes": *[0-9]\{6\}' "$FILE" | grep -o '[0-9]\{6\}' | sort -n | tail -1)
+          echo "last=${LAST:-0}" >> "$GITHUB_OUTPUT"
+          echo "Depois: ${LAST:-nenhum}"
+
+      - name: Commit and push if a new month landed
+        env:
+          BEFORE: ${{ steps.before.outputs.last }}
+          AFTER: ${{ steps.after.outputs.last }}
+        run: |
+          if [ "$AFTER" -le "$BEFORE" ]; then
+            echo "Nenhum mês novo ($AFTER). Descartando alterações."
+            git checkout -- public/data/
+            exit 0
+          fi
+
+          MONTHS=(jan feb mar apr may jun jul aug sep oct nov dec)
+          YEAR=${AFTER:0:4}
+          MONTH_NUM=$((10#${AFTER:4:2}))
+          LABEL="${MONTHS[$((MONTH_NUM-1))]}/${YEAR}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898333+github-actions[bot]@users.noreply.github.com"
+          git add public/data/
+          git commit -m "data: refresh snapshots BCB (${LABEL})"
+          git push
+          echo "Novo mês publicado: ${LABEL}"
